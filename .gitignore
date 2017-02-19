@@ -1,0 +1,13 @@
+*.o
+*.log
+*.exe
+*.out
+
+*.nes
+*.nsf
+*.s
+*.cdl
+*.nl
+*.deb
+
+mm5sndrom.h

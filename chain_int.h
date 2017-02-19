@@ -27,7 +27,7 @@ public:
 	~ChainInt() noexcept = default;
 
 	operator max_type() const noexcept { return x_; }
-	uint8_t &operator[](size_t n) noexcept { return *data_[n]; }
+	elem_type &operator[](size_t n) noexcept { return *data_[n]; }
 	const elem_type &operator[](size_t n) const noexcept { return *data_[n]; }
 
 	ChainInt &operator=(const ChainInt &other) noexcept {
@@ -51,8 +51,8 @@ public:
 #undef ASSIGN
 
 #define UNARY(FN) \
-	ChainInt &operator FN() { FN x_; update(); return *this; } \
-	max_type operator FN(int) { auto v = x_; operator FN(); return v; }
+	ChainInt &operator FN() noexcept { FN x_; update(); return *this; } \
+	max_type operator FN(int) noexcept { auto v = x_; operator FN(); return v; }
 	UNARY(++)
 	UNARY(--)
 #undef UNARY
@@ -80,7 +80,6 @@ private:
 };
 
 template <class T, class... Arg>
-ChainInt<1 + sizeof...(Arg), std::is_signed<T>::value>
-chain(T &x, Arg&... args) noexcept {
+auto chain(T &x, Arg&... args) noexcept {
 	return ChainInt<1 + sizeof...(Arg), std::is_signed<T>::value>(x, args...);
 }

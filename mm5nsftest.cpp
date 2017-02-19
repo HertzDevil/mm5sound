@@ -1,8 +1,19 @@
 #include "mm5sound.h"
 #include <cstdio>
 #include <cstdlib>
+#include <memory>
 
 using namespace MM5Sound;
+
+namespace {
+
+// using std::make_unique;
+template <class T, class... Arg>
+auto make_unique(Arg&&... args) {
+	return std::unique_ptr<T>(new T(std::forward<Arg>(args)...));
+}
+
+} // namespace
 
 class CEngineNSFLog : public CEngine {
 	uint8_t ReadCallback(uint16_t adr) const override {
@@ -19,14 +30,13 @@ class CEngineNSFLog : public CEngine {
 
 template <class T>
 void PlayNSF(int track, int region, int ticks) {
-	ISongPlayer *mm5 = new T;
+	std::unique_ptr<ISongPlayer> mm5 = make_unique<T>();
 	printf("INIT(%02X,%02X)\n", track, region);
 	mm5->CallINIT(track, region);
 	for (int t = 0; t < ticks; ++t) {
 		printf("PLAY(%d)\n", t);
 		mm5->CallPLAY();
 	}
-	delete mm5;
 }
 
 int main(int argc, char **argv) {

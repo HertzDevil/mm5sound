@@ -31,7 +31,7 @@ protected:
 private:
 	void Multiply();
 	void SwitchDispatch(FuncList_t funcs);
-	void ReadROM();
+	uint8_t ReadROM(uint16_t adr);
 	void StepDriver();
 	void SilenceChannel();
 	void Write2A03();
@@ -44,7 +44,7 @@ private:
 	void Func8252();
 	void Func82DE();
 	void Func8326();
-	void Func8386();
+	void GetSFXData();
 	void ProcessChannel();
 	void CommandDispatch();
 	void GetTrackData();
@@ -98,6 +98,7 @@ private:
 	void WritePitchReg();
 
 	uint8_t var_globalTrsp; // $CB
+	uint16_t sfx_currentPtr; // $D0 - $D1
 
 	static const uint8_t NOTE_LENGTH[];
 	static const uint8_t NOTE_LENGTH_DOTTED[];
@@ -129,6 +130,10 @@ private:
 73C	gate time
 740	sustain duration
 744	loop count 1
+748	loop count 2
+74C	loop count 3
+750	loop count 4
+754	period high byte cache
 */
 };
 

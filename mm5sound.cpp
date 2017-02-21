@@ -88,19 +88,19 @@ void CEngine::SwitchDispatch(FuncList_t funcs) {
 	(this->*(*(funcs.begin() + A_)))();
 }
 
-void CEngine::ReadROM() {
+uint8_t CEngine::ReadROM(uint16_t adr) {
 	// $803A - $806B
-	auto adr = chain(A_, Y_);
 	chain(mem_[0xC2], mem_[0xC1]) = adr;
-	A_ = ReadCallback(adr); // bankswitching code omitted
+	A_ = adr >> 8;
 	Y_ = 0;
+	return ReadCallback(adr); // bankswitching code omitted
 }
 
 void CEngine::StepDriver() {
 	// $806C - $80D7
 	if (mem_[0xC0] & 0x01)
 		return;
-	if (mem_[0xD0] | mem_[0xD1])
+	if (sfx_currentPtr)
 		Func8252();
 
 	chain(mem_[0xC7], mem_[0xC8]) = chain(mem_[0xC9], mem_[0xCA]) + mem_[0xC8];
@@ -108,7 +108,7 @@ void CEngine::StepDriver() {
 	auto A1 = mem_[0xCF];
 	for (X_ = 0x03; X_ < 0x80; --X_) {
 		if (lsr(mem_[0xCF])) {
-			A_ = (mem_[0xCF] |= 0x80);
+			mem_[0xCF] |= 0x80;
 			Func82DE();
 		}
 		if (!(mem_[0xC0] & 0x02)) {
@@ -182,12 +182,11 @@ void CEngine::Func8106() {
 void CEngine::Func8118() {
 	// $8118 - $816E
 	X_ = A_ << 1;
-	Y_ = ReadCallback(SONG_TABLE + 3 + X_);
-	if (!(Y_ | ReadCallback(SONG_TABLE + 2 + X_)))
+	uint16_t adr = ReadCallback(SONG_TABLE + 3 + X_) | (ReadCallback(SONG_TABLE + 2 + X_) << 8);
+	Y_ = adr & 0xFF;
+	if (!adr)
 		return;
-	A_ = ReadCallback(SONG_TABLE + 2 + X_);
-	ReadROM();
-	Y_ = A_;
+	Y_ = A_ = ReadROM(adr);
 	if (A_) {
 		++X_;
 		mem_[0xC4] = A_;
@@ -202,7 +201,7 @@ void CEngine::Func8118() {
 			mem_[0xD6] = 0x80;
 			mem_[0xD7] = X_;
 		}
-		chain(mem_[0xD1], mem_[0xD0]) = ++chain(mem_[0xC2], mem_[0xC1]);
+		sfx_currentPtr = ++chain(mem_[0xC2], mem_[0xC1]);
 		mem_[0xD2] = mem_[0xD3] = mem_[0xD4] = mem_[0xD5] = 0;
 		for (Y_ = 0x27; Y_ < 0x80u; --Y_)
 			mem_[0x700 + Y_] = 0;
@@ -215,13 +214,9 @@ void CEngine::Func8118() {
 		for (X_ = 0x53; X_ < 0x80u; --X_)
 			mem_[0x728 + X_] = 0;
 		for (X_ = 0x03; X_ < 0x80u; --X_) {
-			chain(A_, Y_) = ++chain(mem_[0xC2], mem_[0xC1]);
-			ReadROM();
-			mem_[0x754 + X_] = A_;
-
-			chain(A_, Y_) = ++chain(mem_[0xC2], mem_[0xC1]);
-			ReadROM();
-			mem_[0x750 + X_] = A_;
+			auto adr = chain(mem_[0xC2], mem_[0xC1]);
+			mem_[0x754 + X_] = ReadROM(++adr);
+			mem_[0x750 + X_] = ReadROM(++adr);
 		}
 		Func81F1();
 	}
@@ -237,7 +232,7 @@ void CEngine::L81C5() {
 
 void CEngine::L81C8() {
 	// $81C8 - $81D3
-	mem_[0xCE] = mem_[0xD0] = mem_[0xD1] = mem_[0xD7] = mem_[0xD8] = A_ = 0;
+	A_ = sfx_currentPtr = mem_[0xCE] = mem_[0xD7] = mem_[0xD8] = 0;
 	Func81D4();
 }
 
@@ -318,7 +313,7 @@ void CEngine::L824A() {
 }
 
 void CEngine::Func8252() {
-	// $8252 - $8295
+	// $8252 - $82A5
 	if (mem_[0xD3]) {
 		A_ = mem_[0xD3]--;
 		--mem_[0xD5];
@@ -328,7 +323,7 @@ void CEngine::Func8252() {
 	A_ = 0;
 	bool C = false; // php/plp
 	while (true) {
-		Func8386();
+		GetSFXData();
 		mem_[0xC4] = A_;
 		if (asl(A_)) {
 			mem_[0xCE] = Y_;
@@ -342,54 +337,60 @@ void CEngine::Func8252() {
 		}
 		if (!lsr(mem_[0xC4]))
 			break;
-		Func8386();
+		GetSFXData();
 		A_ <<= 1;
 		if (A_) {
 			C = mem_[0xD6] >= 0x80u;
 			auto temp = mem_[0xD6];
 			mem_[0xD6] <<= 1;
-			if (A_ == mem_[0xD6])
+			if (A_ == mem_[0xD6]) {
+				A_ = Y_ >> 1;
+				if (C)
+					A_ |= 0x80;
+				mem_[0xD6] = A_;
+				sfx_currentPtr += 2;
 				break;
+			}
 			mem_[0xD6] = temp + 1;
 		}
-		Func8386();
+		GetSFXData();
 		X_ = A_;
-		Func8386();
-		mem_[0xD0] = A_;
-		mem_[0xD1] = X_;
-		if (!A_)
-			break;
+		GetSFXData();
+		sfx_currentPtr = chain(X_, A_);
+		if (A_)
+			continue;
+		A_ = Y_ >> 1;
+		if (C)
+			A_ |= 0x80;
+		mem_[0xD6] = A_;
+		sfx_currentPtr += 2;
+		break;
 	}
 
-	// $8296 - $82DD
-	A_ = Y_ >> 1;
-	if (C)
-		A_ |= 0x80;
-	mem_[0xD6] = A_;
-	chain(mem_[0xD1], mem_[0xD0]) += 2;
+	// $82A6 - $82DD
 	if (lsr(mem_[0xC4])) {
-		Func8386();
+		GetSFXData();
 		mem_[0xD4] = A_;
 	}
 	if (lsr(mem_[0xC4])) {
-		Func8386();
+		GetSFXData();
 		mem_[0xD2] = A_;
 	}
-	Func8386();
+	GetSFXData();
 	mem_[0xC1] = mem_[0xD3] = A_;
 	mem_[0xC4] = mem_[0xD4];
 	Multiply();
 	Y_ = mem_[0xC1];
 	mem_[0xD5] = Y_ + 1;
 	++mem_[0xC0];
-	Func8386();
+	GetSFXData();
 	auto A1 = A_;
 	A_ ^= mem_[0xCF];
 	if (A_) {
 		mem_[0xCF] = A_;
 		Func81D4();
 	}
-	mem_[0xCF] = A_;
+	mem_[0xCF] = A1;
 }
 
 void CEngine::Func82DE() {
@@ -421,11 +422,11 @@ void CEngine::Func82DE() {
 
 	// $830A - $8325
 	A_ = mem_[0xC4] = 0;
-	Func8386();
+	GetSFXData();
 	while (true) {
 		if (lsr(A_)) {
 			auto A1 = A_;
-			Func8386();
+			GetSFXData();
 			mem_[0xC3] = A_;
 			A_ = mem_[0xC4];
 			Func8326();
@@ -441,7 +442,7 @@ void CEngine::Func82DE() {
 	}
 
 	// $8333 - $8385
-	Func8386();
+	GetSFXData();
 	Y_ = A_;
 	if (!A_) {
 		mem_[0x710 + X_] = A_;
@@ -486,11 +487,9 @@ void CEngine::Func8326() {
 	}
 }
 
-void CEngine::Func8386() {
+void CEngine::GetSFXData() {
 	// $8386 - $8392
-	auto adr = chain(mem_[0xD1], mem_[0xD0]);
-	chain(A_, Y_) = adr++;
-	ReadROM();
+	A_ = ReadROM(sfx_currentPtr++);
 }
 
 void CEngine::ProcessChannel() {
@@ -787,8 +786,7 @@ void CEngine::CmdDuty() {
 void CEngine::GetTrackData() {
 	// $8592 - $85A2
 	auto adr = chain(mem_[0x72C + X_], mem_[0x728 + X_]);
-	chain(A_, Y_) = adr++;
-	ReadROM();
+	A_ = ReadROM(adr++);
 }
 
 void CEngine::Func85A3() {

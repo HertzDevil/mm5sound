@@ -40,6 +40,6 @@ void PlayNSF(int track, int region, int ticks) {
 }
 
 int main(int argc, char **argv) {
-	PlayNSF<CEngineNSFLog>(0, 0, 1800);
+	PlayNSF<CEngineNSFLog>(argc >= 2 ? atoi(argv[1]) : 0, 0, argc >= 3 ? atoi(argv[2]) : 1800);
 	return 0;
 }

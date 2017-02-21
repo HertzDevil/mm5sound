@@ -135,10 +135,13 @@ void CEngine::StepDriver() {
 	A_ = mem_[0xCD];
 }
 
-void CEngine::SilenceChannel() {
+void CEngine::SilenceChannel(uint8_t id) {
 	// $80D8 - $80EB
-	Y_ = ((X_ & 0x03) ^ 0x03) << 2;
-	WriteCallback(0x4000 + Y_, A_ = (Y_ == 0x08 ? 0 : 0x30));
+	uint16_t adr = 0x4000 | (((id & 0x03) ^ 0x03) << 2);
+	uint8_t value = ((id & 0x03) == 0x01) ? 0 : 0x30;
+	A_ = value;
+	Y_ = adr & 0xFF;
+	WriteCallback(adr, value);
 }
 
 void CEngine::Write2A03() {
@@ -261,7 +264,7 @@ void CEngine::Func81F1() {
 	uint8_t A1 = mem_[0xCF];
 	for (X_ = 3; X_ < 0x80u; --X_) {
 		if (!lsr(mem_[0xCF])) {
-			SilenceChannel();
+			SilenceChannel(X_);
 			if (mem_[0x754 + X_] | mem_[0x750 + X_])
 				A_ = mem_[0x77C + X_] = 0xFF;
 		}
@@ -448,7 +451,7 @@ void CEngine::Func82DE() {
 		mem_[0x710 + X_] = A_;
 		mem_[0x704 + X_] &= 0xF8;
 		mem_[0x704 + X_] |= 0x04;
-		SilenceChannel();
+		SilenceChannel(X_ & 0x03);
 		return;
 	}
 	mem_[0x704 + X_] |= 0x20;
@@ -775,7 +778,7 @@ void CEngine::CmdHalt() {
 	chain(mem_[0x72C + X_], mem_[0x728 + X_]) = 0;
 	A_ = mem_[0xCF];
 	if (mem_[0xCF] < 0x80u)
-		SilenceChannel();
+		SilenceChannel(X_ & 0x03);
 }
 
 void CEngine::CmdDuty() {

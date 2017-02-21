@@ -33,7 +33,7 @@ private:
 	void SwitchDispatch(FuncList_t funcs);
 	uint8_t ReadROM(uint16_t adr);
 	void StepDriver();
-	void SilenceChannel();
+	void SilenceChannel(uint8_t id);
 	void Write2A03();
 	void InitDriver();
 	void Func8106();

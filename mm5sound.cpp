@@ -242,13 +242,12 @@ void CEngine::L81C8() {
 void CEngine::Func81D4() {
 	// $81D4 - $81E3
 	A_ = mem_[0xCF];
-	if (!A_)
+	if (!mem_[0xCF])
 		return;
-	A_ ^= 0x0F;
-	mem_[0xCF] = A_;
+	mem_[0xCF] ^= 0x0F;
 	Func81F1();
+	mem_[0xCF] = 0;
 	A_ = 0;
-	mem_[0xCF] = A_;
 }
 
 void CEngine::Func81E4() {
@@ -261,18 +260,17 @@ void CEngine::Func81E4() {
 
 void CEngine::Func81F1() {
 	// $81F1 - $821D
-	uint8_t A1 = mem_[0xCF];
 	for (X_ = 3; X_ < 0x80u; --X_) {
-		if (!lsr(mem_[0xCF])) {
+		if (!(mem_[0xCF] & (1 << (3 - X_)))) {
 			SilenceChannel(X_);
 			if (mem_[0x754 + X_] | mem_[0x750 + X_])
 				A_ = mem_[0x77C + X_] = 0xFF;
 		}
 	}
-	mem_[0xCF] = A1;
 	WriteCallback(0x4001, 0x08);
 	WriteCallback(0x4005, 0x08);
-	WriteCallback(0x4015, A_ = 0x0F);
+	WriteCallback(0x4015, 0x0F);
+	A_ = 0x0F;
 }
 
 void CEngine::L821E() {
@@ -296,17 +294,16 @@ void CEngine::L822D() {
 
 void CEngine::L8234() {
 	// $8234 - $8249
-	auto A0 = mem_[0xC0] & 0x0F;
-	mem_[0xC0] = A0;
-	mem_[0xCC] = Y_ = mem_[0xC3];
-	if (Y_) {
+	mem_[0xC0] &= 0x0F;
+	Y_ = mem_[0xCC] = mem_[0xC3];
+	if (mem_[0xCC]) {
 		Y_ = 0xFF;
 		if (mem_[0xCD] == 0xFF)
-			mem_[0xCD] = Y_ = 0;
+			Y_ = mem_[0xCD] = 0;
 	}
 	else
 		mem_[0xCD] = 0;
-	A_ = A0;
+	A_ = mem_[0xC0];
 }
 
 void CEngine::L824A() {

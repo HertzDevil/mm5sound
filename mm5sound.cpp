@@ -323,8 +323,7 @@ void CEngine::Func8252() {
 	A_ = 0;
 	bool C = false; // php/plp
 	while (true) {
-		GetSFXData();
-		mem_[0xC4] = A_;
+		A_ = mem_[0xC4] = GetSFXData();
 		if (asl(A_)) {
 			mem_[0xCE] = Y_;
 			A_ = mem_[0xD7];
@@ -337,8 +336,7 @@ void CEngine::Func8252() {
 		}
 		if (!lsr(mem_[0xC4]))
 			break;
-		GetSFXData();
-		A_ <<= 1;
+		A_ = GetSFXData() << 1;
 		if (A_) {
 			C = mem_[0xD6] >= 0x80u;
 			auto temp = mem_[0xD6];
@@ -353,9 +351,8 @@ void CEngine::Func8252() {
 			}
 			mem_[0xD6] = temp + 1;
 		}
-		GetSFXData();
-		X_ = A_;
-		GetSFXData();
+		X_ = GetSFXData();
+		A_ = GetSFXData();
 		sfx_currentPtr = chain(X_, A_);
 		if (A_)
 			continue;
@@ -368,24 +365,18 @@ void CEngine::Func8252() {
 	}
 
 	// $82A6 - $82DD
-	if (lsr(mem_[0xC4])) {
-		GetSFXData();
-		mem_[0xD4] = A_;
-	}
-	if (lsr(mem_[0xC4])) {
-		GetSFXData();
-		mem_[0xD2] = A_;
-	}
-	GetSFXData();
-	mem_[0xC1] = mem_[0xD3] = A_;
+	if (lsr(mem_[0xC4]))
+		mem_[0xD4] = GetSFXData();
+	if (lsr(mem_[0xC4]))
+		mem_[0xD2] = GetSFXData();
+	A_ = mem_[0xC1] = mem_[0xD3] = GetSFXData();
 	mem_[0xC4] = mem_[0xD4];
 	Multiply();
 	Y_ = mem_[0xC1];
 	mem_[0xD5] = Y_ + 1;
 	++mem_[0xC0];
-	GetSFXData();
-	auto A1 = A_;
-	A_ ^= mem_[0xCF];
+	auto A1 = GetSFXData();
+	A_ = A1 ^ mem_[0xCF];
 	if (A_) {
 		mem_[0xCF] = A_;
 		Func81D4();
@@ -421,13 +412,12 @@ void CEngine::Func82DE() {
 	}
 
 	// $830A - $8325
-	A_ = mem_[0xC4] = 0;
-	GetSFXData();
+	mem_[0xC4] = 0;
+	A_ = GetSFXData();
 	while (true) {
 		if (lsr(A_)) {
 			auto A1 = A_;
-			GetSFXData();
-			mem_[0xC3] = A_;
+			mem_[0xC3] = GetSFXData();
 			A_ = mem_[0xC4];
 			Func8326();
 			A_ = A1;
@@ -441,9 +431,8 @@ void CEngine::Func82DE() {
 		}
 	}
 
-	// $8333 - $8385
-	GetSFXData();
-	Y_ = A_;
+	// $8333 - $8385	
+	Y_ = A_ = GetSFXData();
 	if (!A_) {
 		mem_[0x710 + X_] = A_;
 		mem_[0x704 + X_] &= 0xF8;
@@ -487,9 +476,9 @@ void CEngine::Func8326() {
 	}
 }
 
-void CEngine::GetSFXData() {
+uint8_t CEngine::GetSFXData() {
 	// $8386 - $8392
-	A_ = ReadROM(sfx_currentPtr++);
+	return ReadROM(sfx_currentPtr++);
 }
 
 void CEngine::ProcessChannel() {

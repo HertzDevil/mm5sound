@@ -44,7 +44,7 @@ private:
 	void Func8252();
 	void Func82DE();
 	void Func8326();
-	void GetSFXData();
+	uint8_t GetSFXData();
 	void ProcessChannel();
 	void CommandDispatch();
 	void GetTrackData();

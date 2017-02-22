@@ -29,7 +29,7 @@ protected:
 	void WriteCallback(uint16_t adr, uint8_t value) override;
 
 private:
-	void Multiply();
+	uint16_t Multiply(uint8_t a, uint8_t b);
 	void SwitchDispatch(FuncList_t funcs);
 	uint8_t ReadROM(uint16_t adr);
 	void StepDriver();

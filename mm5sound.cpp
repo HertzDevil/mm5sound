@@ -75,11 +75,14 @@ uint8_t CEngine::ReadCallback(uint16_t adr) const {
 
 
 
-void CEngine::Multiply() {
+uint16_t CEngine::Multiply(uint8_t a, uint8_t b) {
 	// $8006 - $8022
 	// destroys A
-	chain(mem_[0xC1], mem_[0xC2]) = mem_[0xC1] * mem_[0xC4];
+	uint16_t res = a * b;
+	chain(mem_[0xC1], mem_[0xC2]) = res;
+	mem_[0xC4] = b;
 	Y_ = 0;
+	return res;
 }
 
 void CEngine::SwitchDispatch(FuncList_t funcs) {
@@ -369,10 +372,8 @@ void CEngine::Func8252() {
 		mem_[0xD4] = GetSFXData();
 	if (lsr(mem_[0xC4]))
 		mem_[0xD2] = GetSFXData();
-	A_ = mem_[0xC1] = mem_[0xD3] = GetSFXData();
-	mem_[0xC4] = mem_[0xD4];
-	Multiply();
-	Y_ = mem_[0xC1];
+	mem_[0xD3] = GetSFXData();
+	Y_ = Multiply(mem_[0xD3], mem_[0xD4]) >> 8;
 	mem_[0xD5] = Y_ + 1;
 	++mem_[0xC0];
 	auto A1 = GetSFXData();
@@ -539,13 +540,9 @@ void CEngine::ProcessChannel() {
 		mem_[0x740 + X_] = A_ = 0xFF;
 		return;
 	}
-	const auto A2 = A_;
-	mem_[0xC4] = Y_;
-	mem_[0xC1] = mem_[0x73C + X_];
-	Multiply();
-	A_ = mem_[0xC1] ? mem_[0xC1] : 1;
-	mem_[0x740 + X_] = A_;
-	A_ = A2;
+	mem_[0x740 + X_] = Multiply(mem_[0x73C + X_], Y_) >> 8;
+	if (!mem_[0x740 + X_])
+		mem_[0x740 + X_] = 1;
 	Y_ = A_ - 1;
 
 	// $8430 - $847D
@@ -792,10 +789,7 @@ void CEngine::Func85AE() {
 	A_ = mem_[0x704 + X_] &= 0xF8;
 
 	if (X_ == 0x01) {
-		mem_[0xC1] = mem_[0xD3];
-		mem_[0xC4] = mem_[0x70C + X_];
-		Multiply();
-		Y_ = mem_[0xC1] + 1;
+		Y_ = (Multiply(mem_[0xD3], mem_[0x70C + X_]) >> 8) + 1;
 		++mem_[0x704 + X_];
 		++mem_[0x704 + X_];
 	}
@@ -982,15 +976,9 @@ void CEngine::L8720() {
 			A_ ^= 0xFF;
 		if (A_ != 0xFF) {
 			if (X_ == 0x29) {
-				mem_[0xC4] = A_;
-				A_ = mem_[0xC1] = mem_[0x740 + X_];
-				Multiply();
-				A_ = mem_[0xC1];
-				if (!mem_[0xC1]) {
-					WriteVolumeReg();
-					return;
-				}
-				A_ = mem_[0x710 + X_] ? 0xFF : 0;
+				A_ = Multiply(mem_[0x740 + X_], A_) >> 8;
+				if (A_)
+					A_ = mem_[0x710 + X_] ? 0xFF : 0;
 				WriteVolumeReg();
 				return;
 			}
@@ -1019,19 +1007,15 @@ void CEngine::L8720() {
 	A_ = (A_ >> 4) ^ 0x0F;
 	mem_[0xC3] = A_;
 	Y_ = 6;
-	A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 6);
-	if (A_ >= 0x05) {
-		mem_[0xC4] = A_;
+	const auto tremoloLv = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 6);
+	if (tremoloLv >= 0x05) {
+		mem_[0xC4] = tremoloLv;
 		Y_ = mem_[0x708 + X_];
-		A_ = mem_[0x704 + X_];
-		bool C = (A_ & 0x40) != 0;
-		A_ = Y_;
-		if (C)
+		A_ = mem_[0x708 + X_];
+		if (mem_[0x704 + X_] & 0x40)
 			A_ ^= 0xFF;
 		if (A_) {
-			mem_[0xC1] = A_;
-			Multiply();
-			A_ = mem_[0xC1] >> 2;
+			A_ = Multiply(A_, tremoloLv) >> 10;
 			if (A_ >= 0x10) {
 				A_ = mem_[0x70C + X_] & 0xF0;
 				WriteVolumeReg();
@@ -1059,22 +1043,17 @@ void CEngine::WriteVolumeReg() {
 		if (A_ >= 0x80u)
 			break;
 		Y_ = 0x05;
-		A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 5);
-		if (!A_)
+		const auto vibratoLv = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 5);
+		if (!vibratoLv)
 			break;
-		mem_[0xC4] = A_;
 		Y_ = mem_[0x708 + X_];
-		A_ = mem_[0x704 + X_];
-		bool C = (A_ & 0x40) != 0;
-		A_ = Y_;
-		if (C)
+		A_ = mem_[0x708 + X_];
+		if (mem_[0x704 + X_] & 0x40)
 			A_ ^= 0xFF;
 		if (!A_)
 			break;
-		mem_[0xC1] = A_;
-		Multiply();
-		A_ = mem_[0xC1];
-		chain(A_, mem_[0xC2]) >>= 4;
+		auto offset = Multiply(A_, vibratoLv);
+		chain(A_, mem_[0xC2]) = offset >> 4;
 		Y_ = A_;
 		if (!(A_ | mem_[0xC2]))
 			break;
@@ -1104,11 +1083,8 @@ void CEngine::WriteVolumeReg() {
 		Y_ = mem_[0x724 + X_];
 	}
 	if (X_ < 0x28u && mem_[0xD6] >= 0x80u && mem_[0xD8]) {
-		mem_[0xC4] = mem_[0xD8];
-		mem_[0xC1] = Y_;
-		A_ = mem_[0xC2];
-		auto A1 = A_;
-		Multiply();
+		auto A1 = mem_[0xC2];
+		chain(mem_[0xC1], mem_[0xC2]) = Multiply(Y_, mem_[0xD8]);
 		A_ = 0;
 		chain(A_, mem_[0xC2]) += chain(mem_[0xC1], A1);
 		Y_ = A_;

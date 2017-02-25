@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <utility>
 using std::size_t;
 
 namespace {
@@ -86,7 +87,54 @@ private:
 	}
 };
 
+namespace {
+
+template <class... Arg>
+struct all_lv_refs;
+template <class T>
+struct all_lv_refs<T> : std::is_lvalue_reference<T> { };
 template <class T, class... Arg>
-auto chain(T &x, Arg&... args) noexcept {
-	return ChainInt<1 + sizeof...(Arg), std::is_signed<T>::value>(x, args...);
+struct all_lv_refs<T, Arg...> : std::integral_constant<bool,
+	std::is_lvalue_reference<T>::value && all_lv_refs<Arg...>::value> { };
+
+template <bool B, class T, class... Arg>
+struct chain_impl;
+template <class T, class... Arg>
+struct chain_impl<false, T, Arg...> {
+	using U = conditional_t<std::is_signed<T>::value, intmax_t, uintmax_t>;
+	U operator()(T &&x, Arg&&... args) const noexcept {
+		return combine(x, args...);
+	}
+private:
+	static constexpr U combine() noexcept {
+		return 0;
+	}
+	template <class _T>
+	static constexpr U combine(_T x) noexcept {
+		return x & static_cast<T>(~0);
+	}
+	template <class _T, class... _Arg>
+	static constexpr U combine(_T x, _Arg... args) noexcept {
+		return (combine(x) << (sizeof...(args) * sizeof(T) * 8))
+			| combine(args...);
+	}	
+};
+template <class T, class... Arg>
+struct chain_impl<true, T, Arg...> {
+	auto operator()(T &&x, Arg&&... args) const noexcept
+	-> ChainInt<1 + sizeof...(Arg), std::is_signed<T>::value> {
+		return ChainInt<1 + sizeof...(Arg), std::is_signed<T>::value>(x, args...);
+	}
+};
+
+} // namespace
+
+inline auto chain() noexcept {
+	return 0;
+}
+
+template <class T, class... Arg>
+inline auto chain(T &&x, Arg&&... args) noexcept {
+	return chain_impl<all_lv_refs<T, Arg...>::value, T, Arg...>()(
+		std::forward<T>(x), std::forward<Arg>(args)...);
 }

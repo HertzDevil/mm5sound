@@ -17,6 +17,8 @@ struct CSFXTrack {
 	uint8_t &note;		// $071C
 	ChainInt<2> pitch;	// $0720
 
+	virtual void Reset();
+
 	const uint8_t index;
 	const uint8_t channelID;
 };
@@ -34,6 +36,8 @@ struct CMusicTrack : public CSFXTrack {
 	uint8_t &loopCount3;	// $074C
 	uint8_t &loopCount4;	// $0750
 	uint8_t &periodCache;	// $0754
+
+	void Reset() override;
 };
 
 struct ISongPlayer {
@@ -72,7 +76,7 @@ private:
 	void Func8326();
 	uint8_t GetSFXData();
 	void ProcessChannel(uint8_t id);
-	void CommandDispatch();
+	void CommandDispatch(uint8_t id);
 	uint8_t GetTrackData(uint8_t id);
 	void Func85A3();
 	void Func85AE();
@@ -91,27 +95,28 @@ private:
 	void L8234();
 	void L824A();
 
-	void CmdTriplet();
-	void CmdTie();
-	void CmdDot();
-	void Cmd15va();
-	void CmdFlags();
-	void CmdTempo();
-	void CmdGate();
-	void CmdVolume();
-	void CmdEnvelope();
-	void CmdOctave();
-	void CmdGlobalTrsp();
-	void CmdTranspose();
-	void CmdDetune();
-	void CmdPortamento();
-	void CmdLoop1();
-	void CmdLoop2();
-	void CmdLoop3();
-	void CmdLoop4();
-	void CmdGoto();
-	void CmdHalt();
-	void CmdDuty();
+	void CmdTriplet(uint8_t id);
+	void CmdTie(uint8_t id);
+	void CmdDot(uint8_t id);
+	void Cmd15va(uint8_t id);
+	void CmdFlags(uint8_t id);
+	void CmdTempo(uint8_t id);
+	void CmdGate(uint8_t id);
+	void CmdVolume(uint8_t id);
+	void CmdEnvelope(uint8_t id);
+	void CmdOctave(uint8_t id);
+	void CmdGlobalTrsp(uint8_t id);
+	void CmdTranspose(uint8_t id);
+	void CmdDetune(uint8_t id);
+	void CmdPortamento(uint8_t id);
+//	void CmdLoop1(uint8_t id);
+//	void CmdLoop2(uint8_t id);
+//	void CmdLoop3(uint8_t id);
+//	void CmdLoop4(uint8_t id);
+	void CmdLoop(uint8_t id, uint8_t level);
+	void CmdGoto(uint8_t id);
+	void CmdHalt(uint8_t id);
+	void CmdDuty(uint8_t id);
 
 	void L86D1();
 	void L86E6();
@@ -119,7 +124,6 @@ private:
 	void L8720();
 	void L88A0();
 
-	void CmdLoopImpl();
 	void WriteVolumeReg();
 	void WritePitchReg();
 

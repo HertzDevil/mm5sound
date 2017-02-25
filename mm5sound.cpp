@@ -88,6 +88,20 @@ const uint16_t CEngine::INSTRUMENT_TABLE = 0x8ADB;
 
 
 
+CEngine::CEngine() {
+	for (int i = 0; i < 4; ++i) {
+		sfx_[i] = new CSFXTrack(mem_, i);
+		mus_[i] = new CMusicTrack(mem_, i | 0x28);
+	}
+}
+
+CEngine::~CEngine() {
+	for (int i = 0; i < 4; ++i) {
+		delete sfx_[i];
+		delete mus_[i];
+	}
+}
+
 void CEngine::CallINIT(uint8_t track, uint8_t region) {
 	// $8003 - $8005
 	A_ = track;

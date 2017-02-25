@@ -20,14 +20,13 @@ class ChainInt {
 	static_assert(N <= sizeof(max_type), "Chained integer too large");
 
 	elem_type *data_[N];
-	max_type x_;
 
 public:
 	template <class... Arg>
-	ChainInt(Arg&... args) noexcept : data_ {&args...}, x_(combine(args...)) { }
+	ChainInt(Arg&... args) noexcept : data_ {&args...} { }
 	~ChainInt() noexcept = default;
 
-	operator max_type() const noexcept { return x_; }
+	operator max_type() const noexcept { return fetch(); }
 	elem_type &operator[](size_t n) noexcept { return *data_[n]; }
 	const elem_type &operator[](size_t n) const noexcept { return *data_[n]; }
 
@@ -35,10 +34,15 @@ public:
 		return operator=(static_cast<const max_type&>(other));
 	}
 
+	ChainInt &operator=(const max_type &other) noexcept {
+		update(other);
+		return *this;
+	}
 #define ASSIGN(FN) \
 	ChainInt &operator FN(const max_type &other) noexcept { \
-		x_ FN other; update(); return *this; }
-	ASSIGN(=)
+		auto v = fetch(); update(v FN other); \
+		return *this; \
+	}
 	ASSIGN(+=)
 	ASSIGN(-=)
 	ASSIGN(*=)
@@ -52,31 +56,33 @@ public:
 #undef ASSIGN
 
 #define UNARY(FN) \
-	ChainInt &operator FN() noexcept { FN x_; update(); return *this; } \
-	max_type operator FN(int) noexcept { auto v = x_; operator FN(); return v; }
+	ChainInt &operator FN() noexcept { \
+		auto v = fetch(); update(FN v); \
+		return *this; \
+	} \
+	max_type operator FN(int) noexcept { \
+		auto v = fetch(); auto out = v FN; update(v); \
+		return out; \
+	}
 	UNARY(++)
 	UNARY(--)
 #undef UNARY
 
 private:
-	void update() const noexcept {
-		auto v = x_;
+	max_type fetch() const noexcept {
+		max_type z = 0;
 		for (size_t i = 0; i < N; ++i) {
-			*data_[N - i - 1] = v;
-			v >>= sizeof(elem_type) * 8;
+			z <<= sizeof(elem_type) * 8;
+			z |= static_cast<elem_type>(*data_[i]);
 		}
+		return z;
 	}
 
-	static constexpr max_type combine() noexcept {
-		return 0;
-	}
-	static constexpr max_type combine(elem_type x) noexcept {
-		return x & ((elem_type)-1);
-	}
-	template <class... Arg>
-	static constexpr max_type combine(elem_type x, Arg... args) noexcept {
-		return (combine(x) << (sizeof...(args) * sizeof(elem_type) * 8))
-			| combine(args...);
+	void update(max_type in) const noexcept {
+		for (size_t i = 0; i < N; ++i) {
+			*data_[N - i - 1] = in;
+			in >>= sizeof(elem_type) * 8;
+		}
 	}
 };
 

@@ -37,7 +37,7 @@ struct CMusicTrack : public CSFXTrack {
 };
 
 struct ISongPlayer {
-	virtual ~ISongPlayer() noexcept = default;
+	virtual ~ISongPlayer() = default;
 	virtual void CallINIT(uint8_t track, uint8_t region) = 0;
 	virtual void CallPLAY() = 0;
 	virtual uint8_t ReadCallback(uint16_t adr) const = 0;
@@ -46,8 +46,8 @@ struct ISongPlayer {
 
 class CEngine : public ISongPlayer {
 public:
-	CEngine() = default;
-	void BREAK() const;
+	CEngine();
+	~CEngine() override;
 
 protected:
 	void CallINIT(uint8_t track, uint8_t region) override;
@@ -137,14 +137,8 @@ private:
 	uint8_t mem_[0x800] = { };
 	uint8_t A_ = 0u, X_ = 0u, Y_ = 0u;
 
-	CSFXTrack sfx_[4] = {
-		CSFXTrack(mem_, 0x03), CSFXTrack(mem_, 0x02),
-		CSFXTrack(mem_, 0x01), CSFXTrack(mem_, 0x00),
-	};
-	CMusicTrack mus_[4] = {
-		CMusicTrack(mem_, 0x2B), CMusicTrack(mem_, 0x2A),
-		CMusicTrack(mem_, 0x29), CMusicTrack(mem_, 0x28),
-	};
+	CSFXTrack *sfx_[4] = { };
+	CMusicTrack *mus_[4] = { };
 
 /*
 700	envelope index

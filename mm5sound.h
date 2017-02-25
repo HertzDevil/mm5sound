@@ -47,7 +47,7 @@ private:
 	uint8_t GetSFXData();
 	void ProcessChannel();
 	void CommandDispatch();
-	void GetTrackData();
+	uint8_t GetTrackData(uint8_t id);
 	void Func85A3();
 	void Func85AE();
 	void Func85DE();

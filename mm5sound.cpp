@@ -505,7 +505,7 @@ void CEngine::ProcessChannel() {
 
 	// $83CD - $83D9
 	while (true) {
-		GetTrackData();
+		A_ = GetTrackData(X_);
 		const auto cmd = A_;
 		if (cmd >= 0x20u)
 			break;
@@ -582,7 +582,7 @@ void CEngine::CommandDispatch() {
 	// $8497 - $84D8
 	if (A_ >= 0x04u) {
 		mem_[0xC4] = A_;
-		GetTrackData();
+		A_ = GetTrackData(X_);
 		mem_[0xC3] = A_;
 		A_ = mem_[0xC4];
 	}
@@ -640,7 +640,7 @@ void CEngine::CmdFlags() {
 void CEngine::CmdTempo() {
 	// $84F1 - $84FE
 	A_ = mem_[0xC8] = 0;
-	GetTrackData();
+	A_ = GetTrackData(X_);
 	chain(mem_[0xC9], mem_[0xCA]) = chain(mem_[0xC3], A_);
 	Y_ = mem_[0xC9];
 }
@@ -744,14 +744,14 @@ void CEngine::CmdLoopImpl() {
 		CmdFlags();
 	}
 
-	GetTrackData();
+	A_ = GetTrackData(X_);
 	mem_[0xC3] = A_;
 	CmdGoto();
 }
 
 void CEngine::CmdGoto() {
 	// $855A - $8565
-	GetTrackData();
+	A_ = GetTrackData(X_);
 	chain(mem_[0x72C + X_], mem_[0x728 + X_]) = chain(mem_[0xC3], A_);
 	A_ = mem_[0xC3];
 }
@@ -769,10 +769,11 @@ void CEngine::CmdDuty() {
 	A_ = mem_[0x70C + X_] = ((mem_[0x70C + X_] & 0x0F) | mem_[0xC3] | 0x30);
 }
 
-void CEngine::GetTrackData() {
+uint8_t CEngine::GetTrackData(uint8_t id) {
 	// $8592 - $85A2
-	auto adr = chain(mem_[0x72C + X_], mem_[0x728 + X_]);
-	A_ = ReadROM(adr++);
+	id |= 0x28;
+	auto adr = chain(mem_[0x72C + id], mem_[0x728 + id]);
+	return ReadROM(adr++);
 }
 
 void CEngine::Func85A3() {

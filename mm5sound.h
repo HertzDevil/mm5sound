@@ -1,11 +1,40 @@
 #pragma once
 
 #include <cstdint>
-#include <initializer_list>
+#include "chain_int.h"
 
 namespace MM5Sound {
 
+struct CSFXTrack {
+	CSFXTrack(uint8_t *memory, uint8_t id);
+	uint8_t &envNumber;	// $0700
+	uint8_t &envState;	// $0704
+	uint8_t &oscPhase;	// $0708
+	uint8_t &volumeDuty;	// $070C
+	uint8_t &envLevel;	// $0710
+	uint8_t &detune;	// $0714
+	uint8_t &portamento;	// $0718
+	uint8_t &note;		// $071C
+	ChainInt<2> pitch;	// $0720
+protected:
+	uint8_t index;
+	uint8_t channelID;
+};
 
+struct CMusicTrack : public CSFXTrack {
+	CMusicTrack(uint8_t *memory, uint8_t id);
+	ChainInt<2> patternAdr;	// $0728
+	uint8_t &octaveFlag;	// $0730
+	uint8_t &transpose;	// $0734
+	uint8_t &noteWait;	// $0738
+	uint8_t &gateTime;	// $073c
+	uint8_t &sustainWait;	// $0740
+	uint8_t &loopCount1;	// $0744
+	uint8_t &loopCount2;	// $0748
+	uint8_t &loopCount3;	// $074c
+	uint8_t &loopCount4;	// $0750
+	uint8_t &periodCache;	// $0754
+};
 
 struct ISongPlayer {
 	virtual ~ISongPlayer() noexcept = default;
@@ -16,8 +45,6 @@ struct ISongPlayer {
 };
 
 class CEngine : public ISongPlayer {
-	using FuncList_t = std::initializer_list<void (CEngine::*)()>;
-
 public:
 	CEngine() = default;
 	void BREAK() const;
@@ -30,7 +57,6 @@ protected:
 
 private:
 	uint16_t Multiply(uint8_t a, uint8_t b);
-	void SwitchDispatch(FuncList_t funcs);
 	uint8_t ReadROM(uint16_t adr);
 	void StepDriver();
 	void SilenceChannel(uint8_t id);
@@ -111,17 +137,26 @@ private:
 	uint8_t mem_[0x800] = { };
 	uint8_t A_ = 0u, X_ = 0u, Y_ = 0u;
 
+	CSFXTrack sfx_[4] = {
+		CSFXTrack(mem_, 0x03), CSFXTrack(mem_, 0x02),
+		CSFXTrack(mem_, 0x01), CSFXTrack(mem_, 0x00),
+	};
+	CMusicTrack mus_[4] = {
+		CMusicTrack(mem_, 0x2B), CMusicTrack(mem_, 0x2A),
+		CMusicTrack(mem_, 0x29), CMusicTrack(mem_, 0x28),
+	};
+
 /*
 700	envelope index
 704	envelope state
-708	
+708	lfo phase
 70C	volume/duty byte
 710	instrument level
 714	detune
 718	portamento
-71C	
-720	
-724	
+71C	note index
+720	internal pitch, lo
+724	internal pitch, hi
 728	pattern adr, lo
 72C	pattern adr, hi
 730	octave, flags
@@ -137,6 +172,4 @@ private:
 */
 };
 
-
-
-}
+} // namespace MM5Sound

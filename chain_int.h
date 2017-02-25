@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <type_traits>
+using std::size_t;
 
 namespace {
 

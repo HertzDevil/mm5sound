@@ -2,7 +2,6 @@
 #include "mm5sndrom.h"
 #include "mm5constants.h"
 #include <stdexcept>
-#include "chain_int.h"
 
 
 
@@ -31,6 +30,41 @@ namespace {
 		x = z & 0xFF;
 		return z > 0xFFu;
 	}
+}
+
+
+
+CSFXTrack::CSFXTrack(uint8_t *memory, uint8_t id) :
+	envNumber(memory[0x700 + id]),
+	envState(memory[0x704 + id]),
+	oscPhase(memory[0x708 + id]),
+	volumeDuty(memory[0x70C + id]),
+	envLevel(memory[0x710 + id]),
+	detune(memory[0x714 + id]),
+	portamento(memory[0x718 + id]),
+	note(memory[0x71C + id]),
+	pitch(memory[0x724 + id], memory[0x720 + id]),
+	index(id),
+	channelID(id & 0x03)
+{
+}
+
+
+
+CMusicTrack::CMusicTrack(uint8_t *memory, uint8_t id) :
+	CSFXTrack(memory, id),
+	patternAdr(memory[0x72C + id], memory[0x728 + id]),
+	octaveFlag(memory[0x730 + id]),
+	transpose(memory[0x734 + id]),
+	noteWait(memory[0x738 + id]),
+	gateTime(memory[0x73C + id]),
+	sustainWait(memory[0x740 + id]),
+	loopCount1(memory[0x744 + id]),
+	loopCount2(memory[0x748 + id]),
+	loopCount3(memory[0x74C + id]),
+	loopCount4(memory[0x750 + id]),
+	periodCache(memory[0x754 + id])
+{
 }
 
 
@@ -85,11 +119,13 @@ uint16_t CEngine::Multiply(uint8_t a, uint8_t b) {
 	return res;
 }
 
+/*
 void CEngine::SwitchDispatch(FuncList_t funcs) {
 	// $8023 - $8039
 	// destroys A_
 	(this->*(*(funcs.begin() + A_)))();
 }
+*/
 
 uint8_t CEngine::ReadROM(uint16_t adr) {
 	// $803A - $806B
@@ -484,7 +520,7 @@ uint8_t CEngine::GetSFXData() {
 
 void CEngine::ProcessChannel() {
 	// $8393 - 83CC
-	X_ |= 0x28;
+	X_ = X_ | 0x28;
 	if (!(mem_[0x728 + X_] | mem_[0x72C + X_]))
 		return;
 	A_ = mem_[0x738 + X_];
@@ -857,8 +893,7 @@ void CEngine::Func85DE() {
 
 void CEngine::Func8636() {
 	// $8636 - $8643
-	mem_[0x724 + X_] = A_;
-	mem_[0x720 + X_] = mem_[0xC3];
+	chain(mem_[0x724 + X_], mem_[0x720 + X_]) = chain(A_, mem_[0xC3]);
 	Y_ = 0x04;
 	A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + Y_);
 	if (A_ >= 0x80u) {
@@ -1081,8 +1116,8 @@ void CEngine::WriteVolumeReg() {
 
 	// $880C - $8834
 	if (write) {
-		A_ = mem_[0xC2] = mem_[0x720 + X_];
-		Y_ = mem_[0x724 + X_];
+		mem_[0xC2] = mem_[0x720 + X_];
+		chain(Y_, A_) = chain(mem_[0x724 + X_], mem_[0x720 + X_]);
 	}
 	if (X_ < 0x28u && mem_[0xD6] >= 0x80u && mem_[0xD8]) {
 		auto A1 = mem_[0xC2];

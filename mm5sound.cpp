@@ -65,16 +65,11 @@ void CSFXTrack::Reset() {
 
 CMusicTrack::CMusicTrack(uint8_t *memory, uint8_t id) :
 	CSFXTrack(memory, id),
-	patternAdr(memory[0x72C + id], memory[0x728 + id]),
 	octaveFlag(memory[0x730 + id]),
 	transpose(memory[0x734 + id]),
 	noteWait(memory[0x738 + id]),
 	gateTime(memory[0x73C + id]),
 	sustainWait(memory[0x740 + id]),
-	loopCount1(memory[0x744 + id]),
-	loopCount2(memory[0x748 + id]),
-	loopCount3(memory[0x74C + id]),
-	loopCount4(memory[0x750 + id]),
 	periodCache(memory[0x754 + id])
 {
 }
@@ -87,11 +82,11 @@ void CMusicTrack::Reset() {
 	noteWait = 0;
 	gateTime = 0;
 	sustainWait = 0;
-	loopCount1 = 0;
-	loopCount2 = 0;
-	loopCount3 = 0;
-	loopCount4 = 0;
-	periodCache = 0;
+	loopCount[0] = 0;
+	loopCount[1] = 0;
+	loopCount[2] = 0;
+	loopCount[3] = 0;
+	periodCache = 0xFF;
 }
 
 
@@ -283,7 +278,7 @@ void CEngine::Func8106() {
 void CEngine::Func8118() {
 	// $8118 - $816E
 	X_ = A_ << 1;
-	uint16_t adr = ReadCallback(SONG_TABLE + 3 + X_) | (ReadCallback(SONG_TABLE + 2 + X_) << 8);
+	uint16_t adr = chain(ReadCallback(SONG_TABLE + 2 + X_), ReadCallback(SONG_TABLE + 3 + X_));
 	Y_ = adr & 0xFF;
 	if (!adr)
 		return;
@@ -314,10 +309,10 @@ void CEngine::Func8118() {
 		mem_[0xC8] = var_globalTrsp = mem_[0xCC] = mem_[0xCD] = 0;
 		for (auto x : mus_)
 			x->Reset();
-		for (X_ = 0x03; X_ < 0x80u; --X_) {
-			auto adr = chain(mem_[0xC2], mem_[0xC1]);
-			mem_[0x754 + X_] = ReadROM(++adr);
-			mem_[0x750 + X_] = ReadROM(++adr);
+		auto adr = chain(mem_[0xC2], mem_[0xC1]);
+		for (int i = 0x2B; i >= 0x28; --i) {
+			auto hi = ReadROM(++adr);
+			GetMusicTrack(i)->patternAdr = chain(hi, ReadROM(++adr));
 		}
 		Func81F1();
 	}
@@ -503,7 +498,7 @@ void CEngine::Func82DE() {
 		A_ = mem_[0x704 + X_] & 0x04;
 		if (A_)
 			return;
-		Func85A3();
+		ReleaseNote(X_);
 		return;
 	}
 
@@ -590,7 +585,7 @@ void CEngine::ProcessChannel(uint8_t id) {
 			Func86BA();
 		}
 		if (Chan->sustainWait <= mem_[0xC7])
-			Func85A3();
+			ReleaseNote(Chan->index);
 		Chan->sustainWait -= mem_[0xC7];
 		if (Chan->noteWait > mem_[0xC7]) {
 			A_ = Chan->noteWait -= mem_[0xC7];
@@ -631,7 +626,7 @@ void CEngine::ProcessChannel(uint8_t id) {
 	// $840E - $842F
 	A_ = A1 & 0x1F;
 	if (!A_) {
-		Func85A3();
+		ReleaseNote(Chan->index);
 		Chan->sustainWait = A_ = 0xFF;
 		return;
 	}
@@ -692,7 +687,7 @@ void CEngine::CommandDispatch(uint8_t id) {
 	case 0x07: CmdVolume(id); break;
 	case 0x08: CmdEnvelope(id); break;
 	case 0x09: CmdOctave(id); break;
-	case 0x0A: CmdGlobalTrsp(id); break;
+	case 0x0A: CmdGlobalTrsp(); break;
 	case 0x0B: CmdTranspose(id); break;
 	case 0x0C: CmdDetune(id); break;
 	case 0x0D: CmdPortamento(id); break;
@@ -743,7 +738,7 @@ void CEngine::CmdTempo(uint8_t id) {
 	// $84F1 - $84FE
 	CMusicTrack *Chan = GetMusicTrack(id);
 	A_ = mem_[0xC8] = 0;
-	A_ = GetTrackData(X_);
+	A_ = GetTrackData(Chan->index);
 	chain(mem_[0xC9], mem_[0xCA]) = chain(mem_[0xC3], A_);
 	Y_ = mem_[0xC9];
 }
@@ -782,9 +777,8 @@ void CEngine::CmdOctave(uint8_t id) {
 	A_ = Chan->octaveFlag = ((Chan->octaveFlag & 0xF8) | mem_[0xC3]);
 }
 
-void CEngine::CmdGlobalTrsp(uint8_t id) {
+void CEngine::CmdGlobalTrsp() {
 	// $8510 - $8514
-	CMusicTrack *Chan = GetMusicTrack(id);
 	A_ = var_globalTrsp = mem_[0xC3];
 }
 
@@ -835,9 +829,11 @@ void CEngine::CmdLoop(uint8_t id, uint8_t level) {
 	mem_[0xC2] = A_;
 	Y_ = A_ + X_;
 	if (mem_[0xC4] < 0x12u) {
-		A_ = mem_[0x744 + Y_];
-		mem_[0x744 + Y_] = A_ ? (A_ - 1) : mem_[0xC3];
-		if (!mem_[0x744 + Y_]) {
+		if (Chan->loopCount[level])
+			--Chan->loopCount[level];
+		else
+			Chan->loopCount[level] = mem_[0xC3];
+		if (!Chan->loopCount[level]) {
 			// $8566 - $8574
 			Chan->patternAdr += 2;
 			A_ = Chan->patternAdr & 0xFF;
@@ -845,25 +841,23 @@ void CEngine::CmdLoop(uint8_t id, uint8_t level) {
 		}
 	}
 	else {
-		A_ = mem_[0x744 + Y_] - 1;
-		if (A_) {
+		if (Chan->loopCount[level] != 1) {
 			Chan->patternAdr += 2;
 			A_ = Chan->patternAdr & 0xFF;
 			return;
 		}
-		mem_[0x744 + Y_] = A_;
+		--Chan->loopCount[level];
 		CmdFlags(Chan->index);
 	}
 
-	A_ = GetTrackData(X_);
-	mem_[0xC3] = A_;
+	mem_[0xC3] = GetTrackData(Chan->index);
 	CmdGoto(Chan->index);
 }
 
 void CEngine::CmdGoto(uint8_t id) {
 	// $855A - $8565
 	CMusicTrack *Chan = GetMusicTrack(id);
-	A_ = GetTrackData(X_);
+	A_ = GetTrackData(Chan->index);
 	Chan->patternAdr = chain(mem_[0xC3], A_);
 	A_ = mem_[0xC3];
 }
@@ -889,31 +883,31 @@ uint8_t CEngine::GetTrackData(uint8_t id) {
 	return ReadROM(Chan->patternAdr++);
 }
 
-void CEngine::Func85A3() {
+void CEngine::ReleaseNote(uint8_t id) {
 	// $85A3 - $85AD
-	mem_[0x704 + X_] &= 0xF8;
-	mem_[0x704 + X_] |= 0x03;
-	A_ = mem_[0x704 + X_];
+	CSFXTrack *Chan = GetSFXTrack(id);
+	Chan->envState &= 0xF8;
+	Chan->envState |= 0x03;
+	A_ = Chan->envState;
 }
 
 void CEngine::Func85AE() {
 	// $85AE - $85DD
+	CSFXTrack *Chan = GetSFXTrack(X_);
 	auto Y1 = Y_;
 	Y_ = 0;
-	A_ = mem_[0x704 + X_] &= 0xF8;
+	Chan->envState &= 0xF8;
 
 	if (X_ == 0x01) {
-		Y_ = (Multiply(mem_[0xD3], mem_[0x70C + X_]) >> 8) + 1;
-		++mem_[0x704 + X_];
-		++mem_[0x704 + X_];
+		Y_ = (Multiply(mem_[0xD3], Chan->volumeDuty) >> 8) + 1;
+		Chan->envState |= 0x02;
 	}
 	else if (X_ == 0x29) {
-		++Y_;
-		++mem_[0x704 + X_];
-		++mem_[0x704 + X_];
+		Y_ = 1;
+		Chan->envState |= 0x02;
 	}
 
-	mem_[0x710 + X_] = Y_;
+	Chan->envLevel = Y_;
 	A_ = Y_ = Y1;
 }
 

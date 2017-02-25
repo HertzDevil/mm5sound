@@ -6,6 +6,7 @@
 namespace MM5Sound {
 
 struct CSFXTrack {
+	virtual ~CSFXTrack() = default;
 	CSFXTrack(uint8_t *memory, uint8_t id);
 	uint8_t &envNumber;	// $0700
 	uint8_t &envState;	// $0704
@@ -25,16 +26,13 @@ struct CSFXTrack {
 
 struct CMusicTrack : public CSFXTrack {
 	CMusicTrack(uint8_t *memory, uint8_t id);
-	ChainInt<2> patternAdr;	// $0728
+	uint16_t patternAdr;	// $0728
 	uint8_t &octaveFlag;	// $0730
 	uint8_t &transpose;	// $0734
 	uint8_t &noteWait;	// $0738
 	uint8_t &gateTime;	// $073C
 	uint8_t &sustainWait;	// $0740
-	uint8_t &loopCount1;	// $0744
-	uint8_t &loopCount2;	// $0748
-	uint8_t &loopCount3;	// $074C
-	uint8_t &loopCount4;	// $0750
+	uint8_t loopCount[4];	// $0744
 	uint8_t &periodCache;	// $0754
 
 	void Reset() override;
@@ -78,7 +76,7 @@ private:
 	void ProcessChannel(uint8_t id);
 	void CommandDispatch(uint8_t id);
 	uint8_t GetTrackData(uint8_t id);
-	void Func85A3();
+	void ReleaseNote(uint8_t id);
 	void Func85AE();
 	void Func85DE();
 	void Func8636();
@@ -105,7 +103,7 @@ private:
 	void CmdVolume(uint8_t id);
 	void CmdEnvelope(uint8_t id);
 	void CmdOctave(uint8_t id);
-	void CmdGlobalTrsp(uint8_t id);
+	void CmdGlobalTrsp();
 	void CmdTranspose(uint8_t id);
 	void CmdDetune(uint8_t id);
 	void CmdPortamento(uint8_t id);

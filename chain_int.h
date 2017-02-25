@@ -111,7 +111,7 @@ private:
 	}
 	template <class _T>
 	static constexpr U combine(_T x) noexcept {
-		return x & static_cast<T>(~0);
+		return x & static_cast<typename std::decay<T>::type>(~0);
 	}
 	template <class _T, class... _Arg>
 	static constexpr U combine(_T x, _Arg... args) noexcept {

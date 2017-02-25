@@ -90,8 +90,8 @@ const uint16_t CEngine::INSTRUMENT_TABLE = 0x8ADB;
 
 CEngine::CEngine() {
 	for (int i = 0; i < 4; ++i) {
-		sfx_[i] = new CSFXTrack(mem_, i);
-		mus_[i] = new CMusicTrack(mem_, i | 0x28);
+		sfx_[3 - i] = new CSFXTrack(mem_, i);
+		mus_[3 - i] = new CMusicTrack(mem_, i | 0x28);
 	}
 }
 
@@ -119,6 +119,26 @@ void CEngine::WriteCallback(uint16_t adr, uint8_t value) {
 
 uint8_t CEngine::ReadCallback(uint16_t adr) const {
 	return MM5ROM.at(adr - 0x8000);
+}
+
+CSFXTrack *CEngine::GetSFXTrack(uint8_t id) const {
+	switch (id) {
+	case 0x00: return sfx_[3];
+	case 0x01: return sfx_[2];
+	case 0x02: return sfx_[1];
+	case 0x03: return sfx_[0];
+	}
+	return GetMusicTrack(id);
+}
+
+CMusicTrack *CEngine::GetMusicTrack(uint8_t id) const {
+	switch (id) {
+	case 0x28: return mus_[3];
+	case 0x29: return mus_[2];
+	case 0x2A: return mus_[1];
+	case 0x2B: return mus_[0];
+	}
+	return nullptr;
 }
 
 
@@ -165,10 +185,9 @@ void CEngine::StepDriver() {
 			Func82DE();
 		}
 		if (!(mem_[0xC0] & 0x02)) {
-			uint8_t X1 = X_;
-			A_ = X_;
-			ProcessChannel();
-			X_ = X1;
+			X_ = X_ | 0x28;
+			ProcessChannel(X_);
+			X_ = X_ & ~0x28;
 		}
 	}
 	mem_[0xCF] = A1;
@@ -532,30 +551,31 @@ uint8_t CEngine::GetSFXData() {
 	return ReadROM(sfx_currentPtr++);
 }
 
-void CEngine::ProcessChannel() {
+void CEngine::ProcessChannel(uint8_t id) {
 	// $8393 - 83CC
-	X_ = X_ | 0x28;
-	if (!(mem_[0x728 + X_] | mem_[0x72C + X_]))
+	CMusicTrack *Chan = GetMusicTrack(id);
+	if (!Chan->patternAdr)
 		return;
-	A_ = mem_[0x738 + X_];
-	if (mem_[0x738 + X_]) {
-		if (Y_ = mem_[0x700 + X_]) {
+	A_ = Chan->noteWait;
+	if (Chan->noteWait > 0) {
+		Y_ = Chan->envNumber;
+		if (Chan->envNumber) {
 			Func8684();
 			Func86BA();
 		}
-		if (mem_[0x740 + X_] <= mem_[0xC7])
+		if (Chan->sustainWait <= mem_[0xC7])
 			Func85A3();
-		mem_[0x740 + X_] -= mem_[0xC7];
-		if (mem_[0x738 + X_] > mem_[0xC7]) {
-			A_ = mem_[0x738 + X_] -= mem_[0xC7];
+		Chan->sustainWait -= mem_[0xC7];
+		if (Chan->noteWait > mem_[0xC7]) {
+			A_ = Chan->noteWait -= mem_[0xC7];
 			return;
 		}
-		mem_[0x738 + X_] -= mem_[0xC7];
+		Chan->noteWait -= mem_[0xC7];
 	}
 
 	// $83CD - $83D9
 	while (true) {
-		A_ = GetTrackData(X_);
+		A_ = GetTrackData(Chan->index);
 		const auto cmd = A_;
 		if (cmd >= 0x20u)
 			break;
@@ -567,7 +587,7 @@ void CEngine::ProcessChannel() {
 	// $83DA - $840D
 	const auto A1 = A_;
 	Y_ = (A1 >> 5) - 1;
-	A_ = mem_[0x730 + X_] << 2;
+	A_ = Chan->octaveFlag << 2;
 	if (A_ >= 0x80u)
 		A_ = NOTE_LENGTH[Y_];
 	else {
@@ -575,57 +595,56 @@ void CEngine::ProcessChannel() {
 		A_ = NOTE_LENGTH_DOTTED[Y_];
 		if (C) {
 			mem_[0xC3] = A_;
-			mem_[0x730 + X_] &= 0xEF;
+			Chan->octaveFlag &= 0xEF;
 			A_ += A_ >> 1;
 		}
 	}
-	A_ += mem_[0x738 + X_];
-	mem_[0x738 + X_] = A_;
-	Y_ = A_;
+	Chan->noteWait += A_;
+	Y_ = Chan->noteWait;
 
 	// $840E - $842F
-	A_ = (A1 & 0x1F);
+	A_ = A1 & 0x1F;
 	if (!A_) {
 		Func85A3();
-		mem_[0x740 + X_] = A_ = 0xFF;
+		Chan->sustainWait = A_ = 0xFF;
 		return;
 	}
-	mem_[0x740 + X_] = Multiply(mem_[0x73C + X_], Y_) >> 8;
-	if (!mem_[0x740 + X_])
-		mem_[0x740 + X_] = 1;
+	Chan->sustainWait = Multiply(Chan->gateTime, Y_) >> 8;
+	if (!Chan->sustainWait)
+		Chan->sustainWait = 1;
 	Y_ = A_ - 1;
 
 	// $8430 - $847D
-	if (mem_[0x730 + X_] < 0x80u) {
+	if (!(Chan->octaveFlag & 0x80)) {
 		Func85AE();
 		A_ = mem_[0xCF];
 		if (mem_[0xCF] < 0x80u) {
 			mem_[0xC3] = Y_;
-			mem_[0x77C + (X_ & 0x03)] = A_ = 0xFF;
+			Chan->periodCache = A_ = 0xFF;
 		}
 	}
-	if (mem_[0x730 + X_] < 0x80u || mem_[0x718 + X_])
-		if (!(X_ & 0x03)) {
+	if (!(Chan->octaveFlag & 0x80) || Chan->portamento)
+		if (Chan->channelID == 0) {
 			mem_[0xC3] = 0;
 			A_ = (Y_ & 0x0F) ^ 0x0F;
 			Func8636();
 		}
 		else {
 			mem_[0xC3] = Y_;
-			Y_ = mem_[0x730 + X_] & 0x0F;
-			A_ = OCTAVE_TABLE[Y_] + mem_[0xC3] + var_globalTrsp + mem_[0x734 + X_];
+			Y_ = Chan->octaveFlag & 0x0F;
+			A_ = OCTAVE_TABLE[Y_] + mem_[0xC3] + var_globalTrsp + Chan->transpose;
 			Func85DE();
 		}
 	else
 		Func8644();
 
 	// $847E - $8496
-	Y_ = mem_[0x730 + X_];
-	mem_[0xC4] = (mem_[0x730 + X_] & 0x40) << 1;
-	A_ = mem_[0xC4] | (mem_[0x730 + X_] & 0x7F);
-	mem_[0x730 + X_] = A_;
+	Y_ = Chan->octaveFlag;
+	mem_[0xC4] = (Chan->octaveFlag & 0x40) << 1;
+	A_ = mem_[0xC4] | (Chan->octaveFlag & 0x7F);
+	Chan->octaveFlag = A_;
 	if (A_ >= 0x80u)
-		mem_[0x740 + X_] = A_ = 0xFF;
+		Chan->sustainWait = A_ = 0xFF;
 }
 
 void CEngine::CommandDispatch() {

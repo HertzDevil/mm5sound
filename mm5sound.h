@@ -16,9 +16,9 @@ struct CSFXTrack {
 	uint8_t &portamento;	// $0718
 	uint8_t &note;		// $071C
 	ChainInt<2> pitch;	// $0720
-protected:
-	uint8_t index;
-	uint8_t channelID;
+
+	const uint8_t index;
+	const uint8_t channelID;
 };
 
 struct CMusicTrack : public CSFXTrack {
@@ -27,11 +27,11 @@ struct CMusicTrack : public CSFXTrack {
 	uint8_t &octaveFlag;	// $0730
 	uint8_t &transpose;	// $0734
 	uint8_t &noteWait;	// $0738
-	uint8_t &gateTime;	// $073c
+	uint8_t &gateTime;	// $073C
 	uint8_t &sustainWait;	// $0740
 	uint8_t &loopCount1;	// $0744
 	uint8_t &loopCount2;	// $0748
-	uint8_t &loopCount3;	// $074c
+	uint8_t &loopCount3;	// $074C
 	uint8_t &loopCount4;	// $0750
 	uint8_t &periodCache;	// $0754
 };
@@ -71,7 +71,7 @@ private:
 	void Func82DE();
 	void Func8326();
 	uint8_t GetSFXData();
-	void ProcessChannel();
+	void ProcessChannel(uint8_t id);
 	void CommandDispatch();
 	uint8_t GetTrackData(uint8_t id);
 	void Func85A3();
@@ -122,6 +122,9 @@ private:
 	void CmdLoopImpl();
 	void WriteVolumeReg();
 	void WritePitchReg();
+
+	CSFXTrack *GetSFXTrack(uint8_t id) const;
+	CMusicTrack *GetMusicTrack(uint8_t id) const;
 
 	uint8_t var_globalTrsp; // $CB
 	uint16_t sfx_currentPtr; // $D0 - $D1

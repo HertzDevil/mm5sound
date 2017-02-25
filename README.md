@@ -15,6 +15,12 @@ $ ./mm5test > output.log
 
 ROM images will no longer be required once there is a music data representation within C++.
 
+To check the correctness of the sound driver:
+
+- Log **all 76** songs from the Mega Man 5 NSF (containing all sound effects, this does not use the 24-song music-only version) from NSFPlay using `LOG_CPU=1 LOG_CPU_FILE=nsf_write.log`, so that each song is played for at least 3 minutes.
+- Run `logs/splitter.lua` from the root directory, which prepares individual logs for each song. The original log can be removed.
+- Run `logs/verify.lua`.
+
 ### Roadmap
 
 - [x] Finish all code (manually)

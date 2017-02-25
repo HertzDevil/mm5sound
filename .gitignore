@@ -10,4 +10,7 @@
 *.nl
 *.deb
 
+mm5test
 mm5sndrom.h
+nsf_write.log
+logs/*.log

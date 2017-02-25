@@ -150,7 +150,7 @@ void CEngine::SilenceChannel(uint8_t id) {
 void CEngine::Write2A03() {
 	// $80EC - $80FD
 	mem_[0xC4] = Y_;
-	Y_ |= (((X_ & 0x03) ^ 0x03) << 2);
+	Y_ |= ((X_ & 0x03) ^ 0x03) << 2;
 	WriteCallback(0x4000 + Y_, A_);
 }
 
@@ -1035,7 +1035,8 @@ void CEngine::L8720() {
 void CEngine::WriteVolumeReg() {
 	// $87AA - $880B
 	Y_ = 0;
-	Write2A03();
+	mem_[0xC4] = 0;
+	WriteCallback(0x4000 | (((X_ & 0x03) ^ 0x03) << 2), A_);
 	Y_ = X_ & 0x03;
 	A_ = mem_[0x77C + Y_];
 	bool write = true;
@@ -1125,15 +1126,17 @@ void CEngine::WriteVolumeReg() {
 	// WritePitchReg
 	// $8884 - $889F
 	Y_ = 2;
+	mem_[0xC4] = 2;
 	A_ = mem_[0xC2];
-	Write2A03();
+	WriteCallback(0x4002 | (((X_ & 0x03) ^ 0x03) << 2), A_);
 	Y_ = X_ & 0x03;
 	A_ = mem_[0x77C + Y_];
 	if (mem_[0xC1] != mem_[0x77C + Y_]) {
 		mem_[0x77C + Y_] = mem_[0xC1];
 		A_ = mem_[0xC1] | 0x08;
+		mem_[0xC4] = 3;
 		Y_ = 3;
-		Write2A03();
+		WriteCallback(0x4003 | (((X_ & 0x03) ^ 0x03) << 2), A_);
 	}
 	L88A0();
 }

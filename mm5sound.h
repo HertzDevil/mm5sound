@@ -79,7 +79,7 @@ private:
 	void ReleaseNote(uint8_t id);
 	void Func85AE();
 	void Func85DE();
-	void Func8636();
+	void Func8636(uint8_t id, uint16_t pitch);
 	void Func8644();
 	void LoadEnvelope(uint8_t index);
 	void Func86BA();

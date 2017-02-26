@@ -543,11 +543,8 @@ void CEngine::Func82DE() {
 	mem_[0x77C + X_] = 0xFF;
 	--Y_;
 	A_ = X_;
-	if (!A_) {
-		mem_[0xC3] = 0;
-		A_ = Y_ ^ 0x0F;
-		Func8636();
-	}
+	if (!A_)
+		Func8636(X_, (Y_ ^ 0x0F) << 8);
 	else {
 		A_ = Y_ + 2;
 		Func85DE();
@@ -635,15 +632,12 @@ void CEngine::ProcessChannel(uint8_t id) {
 		A_ = mem_[0xCF];
 		if (mem_[0xCF] < 0x80u) {
 			mem_[0xC3] = Y_;
-			Chan->periodCache = A_ = 0xFF;
+			A_ = Chan->periodCache = 0xFF;
 		}
 	}
 	if (!(Chan->octaveFlag & 0x80) || Chan->portamento)
-		if (Chan->channelID == 0) {
-			mem_[0xC3] = 0;
-			A_ = (Y_ & 0x0F) ^ 0x0F;
-			Func8636();
-		}
+		if (Chan->channelID == 0)
+			Func8636(X_, ((Y_ & 0x0F) ^ 0x0F) << 8);
 		else {
 			mem_[0xC3] = Y_;
 			Y_ = Chan->octaveFlag & 0x0F;
@@ -815,9 +809,8 @@ void CEngine::CmdLoop4(uint8_t id) {
 void CEngine::CmdLoop(uint8_t id, uint8_t level) {
 	// $8527 - $8559
 	CMusicTrack *Chan = GetMusicTrack(id);
-	A_ = level << 2;
-	mem_[0xC2] = A_;
-	Y_ = A_ + Chan->index;
+//	mem_[0xC2] = level << 2;
+//	Y_ = (level << 2) + Chan->index;
 	if (mem_[0xC4] < 0x12u) {
 		if (Chan->loopCount[level])
 			--Chan->loopCount[level];
@@ -939,21 +932,19 @@ void CEngine::Func85DE() {
 	}
 
 	// $862A - $8635
-	mem_[0xC3] <<= 1;
-	Y_ = mem_[0xC3];
-	mem_[0xC3] = ReadCallback(0x8959 + Y_);
-	A_ = ReadCallback(0x895A + Y_);
-	Func8636();
+	uint16_t adr = 0x8959 + mem_[0xC3] * 2;
+	Func8636(X_, chain(ReadCallback(adr + 1), ReadCallback(adr)));
 }
 
-void CEngine::Func8636() {
+void CEngine::Func8636(uint8_t id, uint16_t pitch) {
 	// $8636 - $8643
-	chain(mem_[0x724 + X_], mem_[0x720 + X_]) = chain(A_, mem_[0xC3]);
+	CSFXTrack *Chan = GetSFXTrack(id);
+	Chan->pitch = pitch;
+	mem_[0xC3] = pitch & 0xFF;
 	Y_ = 0x04;
-	A_ = ReadCallback(var_envelopePtr + Y_);
-	if (A_ >= 0x80u) {
-		mem_[0x708 + X_] = 0;
-		A_ = mem_[0x704 + X_] &= 0x37;
+	if (ReadCallback(var_envelopePtr + 4) & 0x80) {
+		Chan->oscPhase = 0;
+		Chan->envState &= 0x37;
 	}
 	else
 		Func8644();

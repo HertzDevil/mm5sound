@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -g -std=c++1y
+CXXFLAGS = -g -std=c++1y -Wall
 
 all: mm5test
 
@@ -20,5 +20,5 @@ clean:
 	rm -f mm5test
 	rm -f mm5test.exe
 
-#mm5-sound.s: mm5.cfg mm5.nes
-#	da65 -i mm5.cfg
+asm: mm5.cfg mm5.nes
+	da65 -i mm5.cfg

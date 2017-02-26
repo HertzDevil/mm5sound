@@ -81,7 +81,7 @@ private:
 	void Func85DE();
 	void Func8636();
 	void Func8644();
-	void Func8684();
+	void LoadEnvelope(uint8_t index);
 	void Func86BA();
 
 	void L81C5();
@@ -128,6 +128,7 @@ private:
 	CSFXTrack *GetSFXTrack(uint8_t id) const;
 	CMusicTrack *GetMusicTrack(uint8_t id) const;
 
+	uint16_t var_envelopePtr; // $C5 - $C6
 	uint8_t var_globalTrsp; // $CB
 	uint16_t sfx_currentPtr; // $D0 - $D1
 

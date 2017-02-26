@@ -345,7 +345,6 @@ void CEngine::Func81D4() {
 
 void CEngine::Func81E4() {
 	// $81E4 - $81F0
-	A_ = 0;
 	for (X_ = 0x03; X_ < 0x80u; --X_)
 		mem_[0x754 + X_] = mem_[0x750 + X_] = 0;
 	Func81F1();
@@ -479,7 +478,7 @@ void CEngine::Func82DE() {
 	// $82DE - $8309
 	Y_ = mem_[0x700 + X_];
 	if (Y_)
-		Func8684();
+		LoadEnvelope(--Y_);
 	A_ = mem_[0xC0];
 	if (!lsr(A_)) {
 		Func86BA();
@@ -581,7 +580,7 @@ void CEngine::ProcessChannel(uint8_t id) {
 	if (Chan->noteWait > 0) {
 		Y_ = Chan->envNumber;
 		if (Chan->envNumber) {
-			Func8684();
+			LoadEnvelope(--Y_);
 			Func86BA();
 		}
 		if (Chan->sustainWait <= mem_[0xC7])
@@ -767,7 +766,7 @@ void CEngine::CmdEnvelope(uint8_t id) {
 		Chan->envNumber = A_;
 		Y_ = A_;
 		Chan->envState |= 0x08;
-		Func8684();
+		LoadEnvelope(--Y_);
 	}
 }
 
@@ -966,7 +965,7 @@ void CEngine::Func8636() {
 	// $8636 - $8643
 	chain(mem_[0x724 + X_], mem_[0x720 + X_]) = chain(A_, mem_[0xC3]);
 	Y_ = 0x04;
-	A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + Y_);
+	A_ = ReadCallback(var_envelopePtr + Y_);
 	if (A_ >= 0x80u) {
 		mem_[0x708 + X_] = 0;
 		A_ = mem_[0x704 + X_] &= 0x37;
@@ -983,13 +982,12 @@ void CEngine::Func8644() {
 	}
 }
 
-void CEngine::Func8684() {
+void CEngine::LoadEnvelope(uint8_t index) {
 	// $8684 - $86A0
-	mem_[0xC3] = 0;
-	A_ = --Y_;
-	chain(mem_[0xC3], A_) <<= 3;
-	chain(mem_[0xC6], mem_[0xC5]) = INSTRUMENT_TABLE + chain(mem_[0xC3], A_);
-	A_ = mem_[0xC6];
+	uint16_t offset = index << 3;
+	mem_[0xC3] = offset >> 8;
+	var_envelopePtr = INSTRUMENT_TABLE + offset;
+	A_ = var_envelopePtr >> 8;
 }
 
 void CEngine::Func86BA() {
@@ -1009,7 +1007,7 @@ void CEngine::Func86BA() {
 
 void CEngine::L86D1() {
 	// $86D1 - $86E5
-	Y_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]));
+	Y_ = ReadCallback(var_envelopePtr);
 	A_ = mem_[0xC4];
 	if (A_ + ENV_RATE_TABLE[Y_] >= 0xF0u) {
 		A_ = 0xF0;
@@ -1023,8 +1021,8 @@ void CEngine::L86D1() {
 void CEngine::L86E6() {
 	// $86E6 - $8701
 	Y_ = 1;
-	const auto sustainLv = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 2);
-	A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 1);
+	const auto sustainLv = ReadCallback(var_envelopePtr + 2);
+	A_ = ReadCallback(var_envelopePtr + 1);
 	if (!A_) {
 		Y_ = 2;
 		A_ = mem_[0x710 + X_] = sustainLv;
@@ -1057,7 +1055,7 @@ void CEngine::L8702() {
 	}
 	else {
 		Y_ = 3;
-		A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 3);
+		A_ = ReadCallback(var_envelopePtr + 3);
 		if (A_) {
 			Y_ = A_;
 			A_ = mem_[0xC4] - ENV_RATE_TABLE[Y_];
@@ -1114,7 +1112,7 @@ void CEngine::L8720() {
 	A_ = (A_ >> 4) ^ 0x0F;
 	mem_[0xC3] = A_;
 	Y_ = 6;
-	const auto tremoloLv = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 6);
+	const auto tremoloLv = ReadCallback(var_envelopePtr + 6);
 	if (tremoloLv >= 0x05) {
 		mem_[0xC4] = tremoloLv;
 		Y_ = mem_[0x708 + X_];
@@ -1151,7 +1149,7 @@ void CEngine::WriteVolumeReg() {
 		if (A_ >= 0x80u)
 			break;
 		Y_ = 0x05;
-		const auto vibratoLv = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 5);
+		const auto vibratoLv = ReadCallback(var_envelopePtr + 5);
 		if (!vibratoLv)
 			break;
 		Y_ = mem_[0x708 + X_];
@@ -1203,7 +1201,7 @@ void CEngine::WriteVolumeReg() {
 	if (!A_) {
 		A_ = Y_ & 0x0F;
 		Y_ = 0x07;
-		mem_[0xC2] = A_ | ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 7);
+		mem_[0xC2] = A_ | ReadCallback(var_envelopePtr + 7);
 		A_ = mem_[0xC1] = 0;
 	}
 	else {
@@ -1281,7 +1279,7 @@ void CEngine::L88A0() {
 
 	// $88FA - $8914
 	Y_ = 0x04;
-	A_ = ReadCallback(chain(mem_[0xC6], mem_[0xC5]) + 4) & 0x7F;
+	A_ = ReadCallback(var_envelopePtr + 4) & 0x7F;
 	if (A_) {
 		uint8_t C = 0;
 		chain(C, mem_[0x708 + X_]) += A_;

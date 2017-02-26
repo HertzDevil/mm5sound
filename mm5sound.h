@@ -74,7 +74,7 @@ private:
 	void Func8326();
 	uint8_t GetSFXData();
 	void ProcessChannel(uint8_t id);
-	void CommandDispatch(uint8_t id);
+	void CommandDispatch(uint8_t id, uint8_t fx);
 	uint8_t GetTrackData(uint8_t id);
 	void ReleaseNote(uint8_t id);
 	void Func85AE();
@@ -132,8 +132,8 @@ private:
 	uint8_t var_globalTrsp; // $CB
 	uint16_t sfx_currentPtr; // $D0 - $D1
 
+	static const uint8_t NOTE_LENGTH_TRIPLET[];
 	static const uint8_t NOTE_LENGTH[];
-	static const uint8_t NOTE_LENGTH_DOTTED[];
 	static const uint8_t OCTAVE_TABLE[];
 	static const uint8_t ENV_RATE_TABLE[];
 	static const uint8_t TRACK_COUNT;

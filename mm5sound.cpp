@@ -677,10 +677,10 @@ void CEngine::CommandDispatch(uint8_t id, uint8_t fx) {
 	case 0x0B: CmdTranspose(id); break;
 	case 0x0C: CmdDetune(id); break;
 	case 0x0D: CmdPortamento(id); break;
-	case 0x0E: case 0x12: CmdLoop(id, 0); break; // $851B - $851E
-	case 0x0F: case 0x13: CmdLoop(id, 1); break; // $851F - $8522
-	case 0x10: case 0x14: CmdLoop(id, 2); break; // $8523 - $8526
-	case 0x11: case 0x15: CmdLoop(id, 3); break;
+	case 0x0E: case 0x0F: case 0x10: case 0x11: // $851B - $8526
+		CmdLoopEnd(id, fx - 0x0E); break;
+	case 0x12: case 0x13: case 0x14: case 0x15:
+		CmdLoopBreak(id, fx - 0x12); break;
 	case 0x16: CmdGoto(id); break;
 	case 0x17: CmdHalt(id); break;
 	case 0x18: CmdDuty(id); break;
@@ -784,55 +784,32 @@ void CEngine::CmdPortamento(uint8_t id) {
 	A_ = Chan->portamento = mem_[0xC3];
 }
 
-/*
-void CEngine::CmdLoop1(uint8_t id) {
-	// $851B - $851E
-	CmdLoopImpl(id, 0);
-}
-
-void CEngine::CmdLoop2(uint8_t id) {
-	// $851F - $8522
-	CmdLoopImpl(id, 1);
-}
-
-void CEngine::CmdLoop3(uint8_t id) {
-	// $8523 - $8526
-	CmdLoopImpl(id, 2);
-}
-
-void CEngine::CmdLoop4(uint8_t id) {
-	// $8527 - $8528
-	CmdLoopImpl(id, 3);
-}
-*/
-
-void CEngine::CmdLoop(uint8_t id, uint8_t level) {
+void CEngine::CmdLoopEnd(uint8_t id, uint8_t level) {
 	// $8527 - $8559
 	CMusicTrack *Chan = GetMusicTrack(id);
-//	mem_[0xC2] = level << 2;
-//	Y_ = (level << 2) + Chan->index;
-	if (mem_[0xC4] < 0x12u) {
-		if (Chan->loopCount[level])
-			--Chan->loopCount[level];
-		else
-			Chan->loopCount[level] = mem_[0xC3];
-		if (!Chan->loopCount[level]) {
-			// $8566 - $8574
-			Chan->patternAdr += 2;
-			return;
-		}
+	if (Chan->loopCount[level])
+		--Chan->loopCount[level];
+	else
+		Chan->loopCount[level] = mem_[0xC3];
+	if (Chan->loopCount[level]) {
+		mem_[0xC3] = GetTrackData(Chan->index);
+		CmdGoto(Chan->index);
 	}
-	else {
-		if (Chan->loopCount[level] != 1) {
-			Chan->patternAdr += 2;
-			return;
-		}
+	else
+		Chan->patternAdr += 2; // $8566 - $8574
+}
+
+void CEngine::CmdLoopBreak(uint8_t id, uint8_t level) {
+	// $8527 - $8559
+	CMusicTrack *Chan = GetMusicTrack(id);
+	if (Chan->loopCount[level] == 1) {
 		--Chan->loopCount[level];
 		CmdFlags(Chan->index);
+		mem_[0xC3] = GetTrackData(Chan->index);
+		CmdGoto(Chan->index);
 	}
-
-	mem_[0xC3] = GetTrackData(Chan->index);
-	CmdGoto(Chan->index);
+	else
+		Chan->patternAdr += 2;
 }
 
 void CEngine::CmdGoto(uint8_t id) {

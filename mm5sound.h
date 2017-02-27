@@ -107,11 +107,8 @@ private:
 	void CmdTranspose(uint8_t id);
 	void CmdDetune(uint8_t id);
 	void CmdPortamento(uint8_t id);
-//	void CmdLoop1(uint8_t id);
-//	void CmdLoop2(uint8_t id);
-//	void CmdLoop3(uint8_t id);
-//	void CmdLoop4(uint8_t id);
-	void CmdLoop(uint8_t id, uint8_t level);
+	void CmdLoopEnd(uint8_t id, uint8_t level);
+	void CmdLoopBreak(uint8_t id, uint8_t level);
 	void CmdGoto(uint8_t id);
 	void CmdHalt(uint8_t id);
 	void CmdDuty(uint8_t id);

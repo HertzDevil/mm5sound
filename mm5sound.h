@@ -133,6 +133,7 @@ private:
 	static const uint8_t NOTE_LENGTH[];
 	static const uint8_t OCTAVE_TABLE[];
 	static const uint8_t ENV_RATE_TABLE[];
+	static const uint16_t PITCH_TABLE[];
 	static const uint8_t TRACK_COUNT;
 	static const uint16_t SONG_TABLE;
 	static const uint16_t INSTRUMENT_TABLE;
@@ -146,7 +147,12 @@ private:
 /*
 700	envelope index
 704	envelope state
-708	lfo phase
+	0:2	envelope part
+	3	
+	4
+	5	portamento enabled
+	6:7	lfo phase hi
+708	lfo phase lo
 70C	volume/duty byte
 710	instrument level
 714	detune
@@ -157,6 +163,12 @@ private:
 728	pattern adr, lo
 72C	pattern adr, hi
 730	octave, flags
+	0:2	octave
+	3	15va
+	4	dot
+	5	triplet
+	6	tie
+	7	
 734	transpose
 738	note duration
 73C	gate time

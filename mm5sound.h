@@ -82,7 +82,7 @@ private:
 	void Func8636(uint8_t id, uint16_t pitch);
 	void Func8644(uint8_t id);
 	void LoadEnvelope(uint8_t index);
-	void Func86BA();
+	void Func86BA(uint8_t id);
 
 	void L81C5();
 	void L81C8();
@@ -113,10 +113,10 @@ private:
 	void CmdHalt(uint8_t id);
 	void CmdDuty(uint8_t id);
 
-	void L86D1();
-	void L86E6();
-	void L8702();
-	void L8720();
+	void EnvelopeAttack(uint8_t id);
+	void EnvelopeDecay(uint8_t id);
+	void EnvelopeRelease(uint8_t id);
+	void L8720(uint8_t id);
 	void L88A0(uint8_t id);
 
 	void WriteVolumeReg();

@@ -484,7 +484,7 @@ void CEngine::Func82DE() {
 		LoadEnvelope(--Y_);
 	A_ = mem_[0xC0];
 	if (!lsr(A_)) {
-		Func86BA();
+		Func86BA(X_);
 		A_ = mem_[0xD3];
 		if (!A_)
 			return;
@@ -580,7 +580,7 @@ void CEngine::ProcessChannel(uint8_t id) {
 		Y_ = Chan->envNumber;
 		if (Chan->envNumber) {
 			LoadEnvelope(--Y_);
-			Func86BA();
+			Func86BA(X_);
 		}
 		if (Chan->sustainWait <= mem_[0xC7])
 			ReleaseNote(Chan->index);
@@ -946,85 +946,63 @@ void CEngine::LoadEnvelope(uint8_t index) {
 	A_ = var_envelopePtr >> 8;
 }
 
-void CEngine::Func86BA() {
+void CEngine::Func86BA(uint8_t id) {
 	// $86BA - $86D0
-	mem_[0xC4] = mem_[0x710 + X_];
-	A_ = mem_[0x704 + X_] & 0x07;
-	switch (A_) {
-	case 0: L86D1(); break;
-	case 1: L86E6(); break;
+	CSFXTrack *Chan = GetSFXTrack(id);
+	mem_[0xC4] = Chan->envLevel;
+	switch (Chan->envState & 0x07) {
+	case 0: EnvelopeAttack(Chan->index); break;
+	case 1: EnvelopeDecay(Chan->index); break;
 	case 2: break;
-	case 3: L8702(); break;
+	case 3: EnvelopeRelease(Chan->index); break;
 	case 4: return;
 	default: throw std::runtime_error {"unknown envelope state"};
 	}
-	L8720(); // merged
+	L8720(Chan->index); // merged
 }
 
-void CEngine::L86D1() {
+void CEngine::EnvelopeAttack(uint8_t id) {
 	// $86D1 - $86E5
-	Y_ = ReadCallback(var_envelopePtr);
-	A_ = mem_[0xC4];
-	if (A_ + ENV_RATE_TABLE[Y_] >= 0xF0u) {
-		A_ = 0xF0;
-		++mem_[0x704 + X_];
+	CSFXTrack *Chan = GetSFXTrack(id);
+	const auto attRate = ReadCallback(var_envelopePtr);
+
+	if (Chan->envLevel + ENV_RATE_TABLE[attRate] >= 0xF0u) {
+		++Chan->envState;
+		Chan->envLevel = 0xF0;
 	}
 	else
-		A_ += ENV_RATE_TABLE[Y_];
-	mem_[0x710 + X_] = A_;
+		Chan->envLevel += ENV_RATE_TABLE[attRate];
 }
 
-void CEngine::L86E6() {
+void CEngine::EnvelopeDecay(uint8_t id) {
 	// $86E6 - $8701
-	Y_ = 1;
+	CSFXTrack *Chan = GetSFXTrack(id);
+	const auto decayRate = ReadCallback(var_envelopePtr + 1);
 	const auto sustainLv = ReadCallback(var_envelopePtr + 2);
-	A_ = ReadCallback(var_envelopePtr + 1);
-	if (!A_) {
-		Y_ = 2;
-		A_ = mem_[0x710 + X_] = sustainLv;
-		++mem_[0x704 + X_];
+
+	if (!decayRate || Chan->envLevel < ENV_RATE_TABLE[decayRate] ||
+	    Chan->envLevel - ENV_RATE_TABLE[decayRate] < sustainLv) {
+		++Chan->envState;
+		Chan->envLevel = sustainLv;
 	}
-	else {
-		Y_ = A_;
-		A_ = mem_[0xC4] - ENV_RATE_TABLE[Y_];
-		if (mem_[0xC4] < ENV_RATE_TABLE[Y_]) {
-			Y_ = 2;
-			A_ = mem_[0x710 + X_] = sustainLv;
-			++mem_[0x704 + X_];
-		}
-		else {
-			Y_ = 2;
-			if (A_ < sustainLv) {
-				A_ = sustainLv;
-				++mem_[0x704 + X_];
-			}
-			mem_[0x710 + X_] = A_;
-		}
-	}
+	else
+		Chan->envLevel -= ENV_RATE_TABLE[decayRate];
 }
 
-void CEngine::L8702() {
+void CEngine::EnvelopeRelease(uint8_t id) {
 	// $8702 - $871F
-	if ((X_ & 0x03) == 0x01) {
-		++mem_[0x704 + X_];
-		A_ = mem_[0x710 + X_] = 0;
+	CSFXTrack *Chan = GetSFXTrack(id);
+	const auto relRate = ReadCallback(var_envelopePtr + 3);
+
+	if (Chan->channelID == 0x01 || (relRate && Chan->envLevel < ENV_RATE_TABLE[relRate])) {
+		++Chan->envState;
+		Chan->envLevel = 0;
 	}
-	else {
-		Y_ = 3;
-		A_ = ReadCallback(var_envelopePtr + 3);
-		if (A_) {
-			Y_ = A_;
-			A_ = mem_[0xC4] - ENV_RATE_TABLE[Y_];
-			if (mem_[0xC4] < ENV_RATE_TABLE[Y_]) {
-				A_ = 0;
-				++mem_[0x704 + X_];
-			}
-			mem_[0x710 + X_] = A_;
-		}
-	}
+	else if (relRate)
+		Chan->envLevel -= ENV_RATE_TABLE[relRate];
 }
 
-void CEngine::L8720() {
+void CEngine::L8720(uint8_t id) {
 	// $8720 - $8762
 	if (X_ >= 0x28u) {
 		if (mem_[0xCF] >= 0x80u) {

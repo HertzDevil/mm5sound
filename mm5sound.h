@@ -6,8 +6,14 @@
 namespace MM5Sound {
 
 struct CSFXTrack {
-	virtual ~CSFXTrack() = default;
 	CSFXTrack(uint8_t *memory, uint8_t id);
+	virtual ~CSFXTrack() = default;
+
+	virtual void Reset();
+
+	const uint8_t index;
+	const uint8_t channelID;
+
 	uint8_t &envNumber;	// $0700
 	uint8_t &envState;	// $0704
 	uint8_t &oscPhase;	// $0708
@@ -18,24 +24,20 @@ struct CSFXTrack {
 	uint8_t &note;		// $071C
 	ChainInt<2> pitch;	// $0720
 	uint8_t &periodCache;	// $077C
-
-	virtual void Reset();
-
-	const uint8_t index;
-	const uint8_t channelID;
 };
 
 struct CMusicTrack : public CSFXTrack {
-	CMusicTrack(uint8_t *memory, uint8_t id);
-	uint16_t patternAdr;	// $0728
-	uint8_t &octaveFlag;	// $0730
-	uint8_t &transpose;	// $0734
-	uint8_t &noteWait;	// $0738
-	uint8_t &gateTime;	// $073C
-	uint8_t &sustainWait;	// $0740
-	uint8_t loopCount[4];	// $0744
+	using CSFXTrack::CSFXTrack;
 
 	void Reset() override;
+
+	uint16_t patternAdr;	// $0728
+	uint8_t octaveFlag;	// $0730
+	uint8_t transpose;	// $0734
+	uint8_t noteWait;	// $0738
+	uint8_t gateTime;	// $073C
+	uint8_t sustainWait;	// $0740
+	uint8_t loopCount[4];	// $0744
 };
 
 struct ISongPlayer {
@@ -117,10 +119,9 @@ private:
 	void EnvelopeDecay(uint8_t id);
 	void EnvelopeRelease(uint8_t id);
 	void L8720(uint8_t id);
+	void WriteVolumeReg(uint8_t id);
+//	void WritePitchReg(uint8_t id);
 	void L88A0(uint8_t id);
-
-	void WriteVolumeReg();
-	void WritePitchReg();
 
 	CSFXTrack *GetSFXTrack(uint8_t id) const;
 	CMusicTrack *GetMusicTrack(uint8_t id) const;

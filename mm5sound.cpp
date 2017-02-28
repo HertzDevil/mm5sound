@@ -20,16 +20,6 @@ namespace {
 		x <<= 1;
 		return C;
 	}
-	bool adc(uint8_t &x, uint8_t y) {
-		uint16_t z = x + y;
-		x = z & 0xFF;
-		return z > 0xFFu;
-	}
-	bool sbc(uint8_t &x, uint8_t y) {
-		uint16_t z = x - y;
-		x = z & 0xFF;
-		return z > 0xFFu;
-	}
 }
 
 
@@ -44,6 +34,7 @@ CSFXTrack::CSFXTrack(uint8_t *memory, uint8_t id) :
 	portamento(memory[0x718 + id]),
 	note(memory[0x71C + id]),
 	pitch(memory[0x724 + id], memory[0x720 + id]),
+	periodCache(memory[0x77C + (id & 0x03)]),
 	index(id),
 	channelID(id & 0x03)
 {
@@ -69,8 +60,7 @@ CMusicTrack::CMusicTrack(uint8_t *memory, uint8_t id) :
 	transpose(memory[0x734 + id]),
 	noteWait(memory[0x738 + id]),
 	gateTime(memory[0x73C + id]),
-	sustainWait(memory[0x740 + id]),
-	periodCache(memory[0x754 + id])
+	sustainWait(memory[0x740 + id])
 {
 }
 
@@ -536,7 +526,7 @@ void CEngine::Func82DE() {
 	if (A_ >= 0x80u) {
 		if (X_ == 0x01)
 			Func85AE();
-		Func8644();
+		Func8644(X_);
 		return;
 	}
 	Func85AE();
@@ -547,7 +537,7 @@ void CEngine::Func82DE() {
 		Func8636(X_, (Y_ ^ 0x0F) << 8);
 	else {
 		A_ = Y_ + 2;
-		Func85DE();
+		Func85DE(X_);
 	}
 }
 
@@ -642,10 +632,10 @@ void CEngine::ProcessChannel(uint8_t id) {
 			mem_[0xC3] = Y_;
 			Y_ = Chan->octaveFlag & 0x0F;
 			A_ = OCTAVE_TABLE[Y_] + mem_[0xC3] + var_globalTrsp + Chan->transpose;
-			Func85DE();
+			Func85DE(Chan->index);
 		}
 	else
-		Func8644();
+		Func8644(Chan->index);
 
 	// $847E - $8496
 	Chan->octaveFlag &= 0x7F;
@@ -865,52 +855,52 @@ void CEngine::Func85AE() {
 	A_ = Y_ = Y1;
 }
 
-void CEngine::Func85DE() {
+void CEngine::Func85DE(uint8_t id) {
 	// $85DE - $8629
 	if (A_ >= 0x60u)
 		A_ = 0x5F;
 	mem_[0xC3] = A_ + 1;
-	if (X_ >= 0x28u) {
-		if (mem_[0x71C + X_]) {
-			if (mem_[0x71C + X_] == mem_[0xC3]) {
-				if (mem_[0x730 + X_] >= 0x80u) {
-					Func8644();
+	if (CMusicTrack *Mus = GetMusicTrack(id)) {
+		if (Mus->note) {
+			if (Mus->note == mem_[0xC3]) {
+				if (Mus->octaveFlag & 0x80) {
+					Func8644(Mus->index);
 					return;
 				}
 				else {
-					mem_[0x704 + X_] &= 0xDF;
-					A_ = mem_[0x71C + X_] = mem_[0xC3];
+					Mus->envState &= 0xDF;
+					Mus->note = mem_[0xC3];
 				}
 			}
-			else if (mem_[0x718 + X_]) {
-				if (mem_[0x71C + X_] >= mem_[0xC3])
-					mem_[0x718 + X_] &= 0x7F;
+			else if (Mus->portamento) {
+				if (Mus->note >= mem_[0xC3])
+					Mus->portamento &= 0x7F;
 				else
-					mem_[0x718 + X_] |= 0x80;
-				mem_[0x704 + X_] |= 0x20;
+					Mus->portamento |= 0x80;
+				Mus->envState |= 0x20;
 				A_ = mem_[0xC3];
-				Y_ = mem_[0xC3] = mem_[0x71C + X_];
-				if (!mem_[0xC3]) {
-					mem_[0x704 + X_] &= 0xDF;
-					A_ = mem_[0x71C + X_] = mem_[0xC3];
+				Y_ = mem_[0xC3] = Mus->note;
+				if (!Mus->note) {
+					Mus->envState &= 0xDF;
+					Mus->note = mem_[0xC3];
 				}
 				else
-					mem_[0x71C + X_] = A_;
+					Mus->note = A_;
 			}
 			else {
-				mem_[0x704 + X_] &= 0xDF;
-				A_ = mem_[0x71C + X_] = mem_[0xC3];
+				Mus->envState &= 0xDF;
+				Mus->note = mem_[0xC3];
 			}
 		}
 		else {
-			mem_[0x704 + X_] &= 0xDF;
-			A_ = mem_[0x71C + X_] = mem_[0xC3];
+			Mus->envState &= 0xDF;
+			Mus->note = mem_[0xC3];
 		}
 	}
 
 	// $862A - $8635
 	uint16_t adr = 0x8959 + mem_[0xC3] * 2;
-	Func8636(X_, chain(ReadCallback(adr + 1), ReadCallback(adr)));
+	Func8636(id, chain(ReadCallback(adr + 1), ReadCallback(adr)));
 }
 
 void CEngine::Func8636(uint8_t id, uint16_t pitch) {
@@ -924,14 +914,15 @@ void CEngine::Func8636(uint8_t id, uint16_t pitch) {
 		Chan->envState &= 0x37;
 	}
 	else
-		Func8644();
+		Func8644(id);
 }
 
-void CEngine::Func8644() {
+void CEngine::Func8644(uint8_t id) {
 	// $8644 - $8659
-	if (mem_[0x704 + X_] & 0x08) {
-		mem_[0x708 + X_] = 0;
-		A_ = mem_[0x704 + X_] &= 0x37;
+	CSFXTrack *Chan = GetSFXTrack(id);
+	if (Chan->envState & 0x08) {
+		Chan->oscPhase = 0;
+		A_ = Chan->envState &= 0x37;
 	}
 }
 
@@ -1025,7 +1016,7 @@ void CEngine::L8720() {
 	// $8720 - $8762
 	if (X_ >= 0x28u) {
 		if (mem_[0xCF] >= 0x80u) {
-			L88A0();
+			L88A0(X_);
 			return;
 		}
 		A_ = mem_[0xCD];
@@ -1144,14 +1135,12 @@ void CEngine::WriteVolumeReg() {
 	if (X_ < 0x28u && mem_[0xD6] >= 0x80u && mem_[0xD8]) {
 		auto A1 = mem_[0xC2];
 		chain(mem_[0xC1], mem_[0xC2]) = Multiply(Y_, mem_[0xD8]);
-		A_ = 0;
-		chain(A_, mem_[0xC2]) += chain(mem_[0xC1], A1);
+		chain(A_, mem_[0xC2]) = A1 + chain(mem_[0xC1], mem_[0xC2]);
 		Y_ = A_;
 	}
 
 	// $8835 - $8883
-	A_ = X_ & 0x03;
-	if (!A_) {
+	if ((X_ & 0x03) == 0x00) {
 		A_ = Y_ & 0x0F;
 		Y_ = 0x07;
 		mem_[0xC2] = A_ | ReadCallback(var_envelopePtr + 7);
@@ -1159,85 +1148,59 @@ void CEngine::WriteVolumeReg() {
 	}
 	else {
 		A_ = Y_;
-		Y_ = 0x08;
-		do {
-			--Y_;
-		} while (A_ < Y_ * 7); // $8953 - $895A
-		mem_[0xC1] = A_;
-		A_ = Y_ + mem_[0xC1];
-		Y_ = A_;
-		mem_[0xC1] = 0x07 + (A_ & 0x07);
-		A_ = (Y_ & 0x38) ^ 0x38;
-		while (A_) {
-			chain(mem_[0xC1], mem_[0xC2]) >>= 1;
-			A_ -= 8;
-		}
-		Y_ = 0;
-		A_ = mem_[0x714 + X_];
-		if (A_) {
-			if (A_ >= 0x80u)
-				--Y_;
-			chain(mem_[0xC1], mem_[0xC2]) += chain(Y_, A_);
-		}
+		Y_ = A_ / 7; // $8953 - $895A
+		if (Y_ > 0x07u)
+			Y_ = 0x07;
+		Y_ += A_;
+		mem_[0xC1] = 0x07 + (Y_ & 0x07);
+		chain(mem_[0xC1], mem_[0xC2]) >>= 7 - Y_ / 8;
+		chain(Y_, A_) = static_cast<int8_t>(mem_[0x714 + X_]);
+		chain(mem_[0xC1], mem_[0xC2]) += static_cast<int8_t>(mem_[0x714 + X_]);
 	}
 
 	// WritePitchReg
 	// $8884 - $889F
-	Y_ = 2;
 	mem_[0xC4] = 2;
-	A_ = mem_[0xC2];
-	WriteCallback(0x4002 | (((X_ & 0x03) ^ 0x03) << 2), A_);
+	WriteCallback(0x4002 | (((X_ & 0x03) ^ 0x03) << 2), mem_[0xC2]);
 	Y_ = X_ & 0x03;
-	A_ = mem_[0x77C + Y_];
 	if (mem_[0xC1] != mem_[0x77C + Y_]) {
 		mem_[0x77C + Y_] = mem_[0xC1];
-		A_ = mem_[0xC1] | 0x08;
 		mem_[0xC4] = 3;
 		Y_ = 3;
-		WriteCallback(0x4003 | (((X_ & 0x03) ^ 0x03) << 2), A_);
+		WriteCallback(0x4003 | (((X_ & 0x03) ^ 0x03) << 2), mem_[0xC1] | 0x08);
 	}
-	L88A0();
+	L88A0(X_);
 }
 
-void CEngine::L88A0() {
+void CEngine::L88A0(uint8_t id) {
 	// $88A0 - $88F9
-	if (mem_[0x704 + X_] & 0x20) {
-		A_ = mem_[0x718 + X_];
-		if (A_) {
-			auto current = chain(mem_[0x724 + X_], mem_[0x720 + X_]);
-//			const auto target = chain(ReadCallback(0x895A + mem_[0x71C + X_] * 2),
-//			                          ReadCallback(0x8959 + mem_[0x71C + X_] * 2));
-			const uint16_t target = ReadCallback(0x895A + mem_[0x71C + X_] * 2) * 0x100
-			                      + ReadCallback(0x8959 + mem_[0x71C + X_] * 2);
-			bool C = A_ >= 0x80u;
-			A_ <<= 1;
-			if (C) {
-				A_ = -A_;
-				Y_ = 0xFF;
-			}
-			else
-				Y_ = 0;
-			current += chain(Y_, A_);
-			Y_ = mem_[0x71C + X_] << 1;
+	CSFXTrack *Chan = GetSFXTrack(id);
+	if (Chan->envState & 0x20) {
+		if (Chan->portamento) {
+			auto &current = Chan->pitch;
+			const auto target = chain(ReadCallback(0x895A + mem_[0x71C + X_] * 2),
+			                          ReadCallback(0x8959 + mem_[0x71C + X_] * 2));
+			bool C = (Chan->portamento & 0x80) != 0;
+			uint8_t rate = Chan->portamento & 0x7F;
+			current += rate * (C ? -2 : 2);
+			Y_ = Chan->note << 1;
 			bool C2 = (current & 0x3FFF) >= target;
-			A_ = C + C2 - 1;
-			if (!A_ && X_) {
+			if (C != C2 && Chan->index != 0x00) {
 				current = target;
-				A_ = mem_[0x704 + X_] &= 0xDF;
+				Chan->envState &= 0xDF;
 			}
 		}
 		else
-			A_ = mem_[0x704 + X_] &= 0xDF;
+			Chan->envState &= 0xDF;
 	}
 
 	// $88FA - $8914
 	Y_ = 0x04;
-	A_ = ReadCallback(var_envelopePtr + 4) & 0x7F;
-	if (A_) {
+	if (const auto oscRate = ReadCallback(var_envelopePtr + 4) & 0x7F) {
 		uint8_t C = 0;
-		chain(C, mem_[0x708 + X_]) += A_;
+		chain(C, Chan->oscPhase) += oscRate;
 		if (C)
-			mem_[0x704 + X_] += 0x40;
+			Chan->envState += 0x40;
 	}
 }
 

@@ -17,6 +17,7 @@ struct CSFXTrack {
 	uint8_t &portamento;	// $0718
 	uint8_t &note;		// $071C
 	ChainInt<2> pitch;	// $0720
+	uint8_t &periodCache;	// $077C
 
 	virtual void Reset();
 
@@ -33,7 +34,6 @@ struct CMusicTrack : public CSFXTrack {
 	uint8_t &gateTime;	// $073C
 	uint8_t &sustainWait;	// $0740
 	uint8_t loopCount[4];	// $0744
-	uint8_t &periodCache;	// $0754
 
 	void Reset() override;
 };
@@ -78,9 +78,9 @@ private:
 	uint8_t GetTrackData(uint8_t id);
 	void ReleaseNote(uint8_t id);
 	void Func85AE();
-	void Func85DE();
+	void Func85DE(uint8_t id);
 	void Func8636(uint8_t id, uint16_t pitch);
-	void Func8644();
+	void Func8644(uint8_t id);
 	void LoadEnvelope(uint8_t index);
 	void Func86BA();
 
@@ -117,7 +117,7 @@ private:
 	void L86E6();
 	void L8702();
 	void L8720();
-	void L88A0();
+	void L88A0(uint8_t id);
 
 	void WriteVolumeReg();
 	void WritePitchReg();

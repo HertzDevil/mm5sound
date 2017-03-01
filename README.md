@@ -24,7 +24,7 @@ To check the correctness of the sound driver:
 ### Roadmap
 
 - [x] Finish all code (manually)
-- [ ] Verify all music and sound effects are correct
+- [x] Verify all music and sound effects are correct
 - [ ] Music data classes (best make them entirely `constexpr` for extra challenge)
 - [ ] Auxiliary classes that make it look more like "good" C++ ~~and less like FamiTracker~~
 - [ ] Remove the NES memory model

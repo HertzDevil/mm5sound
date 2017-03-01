@@ -25,6 +25,7 @@ class ChainInt {
 public:
 	template <class... Arg>
 	ChainInt(Arg&... args) noexcept : data_ {&args...} { }
+	ChainInt(const ChainInt &) = default;
 	~ChainInt() noexcept = default;
 
 	operator max_type() const noexcept { return fetch(); }

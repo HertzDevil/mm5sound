@@ -541,7 +541,7 @@ void CEngine::Func82DE() {
 	if (!A_)
 		Func8636(X_, (Y_ ^ 0x0F) << 8);
 	else {
-		A_ = Y_ + 2;
+		A_ = Y_ + mem_[0xD2];
 		Func85DE(X_);
 	}
 }
@@ -1026,7 +1026,7 @@ void CEngine::L8720(uint8_t id) {
 		}
 	}
 	else {
-		if (Chan->channelID) {
+		if (Chan->channelID == 0x01) {
 			A_ = Chan->envLevel ? 0xFF : 0;
 			WriteVolumeReg(Chan->index);
 			return;

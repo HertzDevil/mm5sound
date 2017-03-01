@@ -44,6 +44,7 @@ struct ISongPlayer {
 	virtual ~ISongPlayer() = default;
 	virtual void CallINIT(uint8_t track, uint8_t region) = 0;
 	virtual void CallPLAY() = 0;
+	virtual void BREAK() const { }
 	virtual uint8_t ReadCallback(uint16_t adr) const = 0;
 	virtual void WriteCallback(uint16_t adr, uint8_t value) = 0;
 };

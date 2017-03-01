@@ -190,7 +190,8 @@ void CEngine::StepDriver() {
 	if (sfx_currentPtr)
 		Func8252();
 
-	chain(mem_[0xC7], mem_[0xC8]) = chain(mem_[0xC9], mem_[0xCA]) + mem_[0xC8];
+	var_tickElapsed = 0;
+	chain(var_tickElapsed, var_tickCounter) += var_tempo;
 
 	auto A1 = mem_[0xCF];
 	for (X_ = 0x03; X_ < 0x80; --X_) {
@@ -298,8 +299,9 @@ void CEngine::Func8118() {
 	}
 	else {
 		// $816F - $81AD
-		chain(mem_[0xC9], mem_[0xCA]) = 0x0199;
-		mem_[0xC8] = var_globalTrsp = mem_[0xCC] = mem_[0xCD] = 0;
+		var_tempo = 0x0199;
+		var_tickCounter = 0;
+		var_globalTrsp = mem_[0xCC] = mem_[0xCD] = 0;
 		for (auto x : mus_)
 			x->Reset();
 		auto adr = chain(mem_[0xC2], mem_[0xC1]);
@@ -572,14 +574,14 @@ void CEngine::ProcessChannel(uint8_t id) {
 			LoadEnvelope(--Y_);
 			Func86BA(X_);
 		}
-		if (Chan->sustainWait <= mem_[0xC7])
+		if (Chan->sustainWait <= var_tickElapsed)
 			ReleaseNote(Chan->index);
-		Chan->sustainWait -= mem_[0xC7];
-		if (Chan->noteWait > mem_[0xC7]) {
-			Chan->noteWait -= mem_[0xC7];
+		Chan->sustainWait -= var_tickElapsed;
+		if (Chan->noteWait > var_tickElapsed) {
+			Chan->noteWait -= var_tickElapsed;
 			return;
 		}
-		Chan->noteWait -= mem_[0xC7];
+		Chan->noteWait -= var_tickElapsed;
 	}
 
 	// $83CD - $83D9
@@ -715,9 +717,8 @@ void CEngine::CmdFlags(uint8_t id) {
 void CEngine::CmdTempo(uint8_t id) {
 	// $84F1 - $84FE
 	CMusicTrack *Chan = GetMusicTrack(id);
-	mem_[0xC8] = 0;
-	chain(mem_[0xC9], mem_[0xCA]) = chain(mem_[0xC3], GetTrackData(Chan->index));
-	Y_ = mem_[0xC9];
+	var_tickCounter = 0;
+	var_tempo = chain(mem_[0xC3], GetTrackData(Chan->index));
 }
 
 void CEngine::CmdGate(uint8_t id) {

@@ -126,7 +126,11 @@ private:
 	CSFXTrack *GetSFXTrack(uint8_t id) const;
 	CMusicTrack *GetMusicTrack(uint8_t id) const;
 
+protected:
 	uint16_t var_envelopePtr; // $C5 - $C6
+	uint8_t var_tickElapsed; // $C7
+	uint8_t var_tickCounter; // $C8
+	uint16_t var_tempo; // $C9 - $CA
 	uint8_t var_globalTrsp; // $CB
 	uint16_t sfx_currentPtr; // $D0 - $D1
 
